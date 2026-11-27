@@ -1,0 +1,9 @@
+{
+  "cli": { "appVersionSource": "remote" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal" },
+    "preview": { "distribution": "internal" },
+    "preview-icloud": { "distribution": "internal", "env": { "ENABLE_ICLOUD": "1" } },
+    "production": { "env": { "ENABLE_ICLOUD": "1" }, "autoIncrement": true }
+  }
+}
