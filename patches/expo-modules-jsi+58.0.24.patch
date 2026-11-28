@@ -1,0 +1,22 @@
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
+index de76b97..f8e14d5 100644
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/Values/JavaScriptObject.swift
+@@ -942,8 +942,16 @@ private func withEncodedValue(
+     // The runtime can't be deallocated during a call on its JavaScript thread, so it's borrowed without
+     // a retain.
+     try runtime._withUnsafeGuaranteedRef { runtime in
++      // `slot` is borrowed here and also used below in `body(slot.pointee)`. Capturing
++      // `slot` directly into the @JavaScriptActor-isolated closure makes Swift 6's
++      // region-based isolation checker (Xcode 26 / Swift 6.2) report "sending 'slot'
++      // risks causing data races" because of the later use. Route a disconnected,
++      // nonisolated(unsafe) copy of the pointer into the isolated closure instead, so
++      // `slot` itself never enters the actor region. Safe because the closure runs
++      // synchronously on this thread before `body` is reached.
++      nonisolated(unsafe) let isolatedSlot = slot
+       try JavaScriptActor.assumeIsolated {
+-        try encode(JavaScriptValue.Slot(slot), runtime)
++        try encode(JavaScriptValue.Slot(isolatedSlot), runtime)
+       }
+     }
+     body(slot.pointee)
