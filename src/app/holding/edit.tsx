@@ -13,7 +13,6 @@ import { useStore } from '../../lib/store';
 import { GoldUnit, Kind } from '../../lib/types';
 
 export default function EditHolding() {
-  const t = useTheme();
   const params = useLocalSearchParams<{ id?: string; kind?: Kind }>();
   const data = useStore((s) => s.data);
   const { addHolding, updateHolding } = useStore.getState();
@@ -43,10 +42,13 @@ export default function EditHolding() {
   const type = category?.type;
   const live = !!type && supportsLivePrice(type);
 
-  useEffect(() => {
+  // pick the value mode when the category changes between live-priced and manual
+  const [modeSyncedFor, setModeSyncedFor] = useState<boolean | null>(null);
+  if (modeSyncedFor !== live) {
+    setModeSyncedFor(live);
     if (!live && mode === 'quantity') setMode('manual');
     if (live && !existing) setMode('quantity');
-  }, [live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   // debounced coin search
   useEffect(() => {

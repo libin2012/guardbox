@@ -37,9 +37,7 @@ export default function RootLayout() {
 
   const unlocked = ready && !(lockEnabled && locked);
   const needsProfile = unlocked && !hasProfile;
-  useEffect(() => {
-    if (needsProfile) setOnboarding(true);
-  }, [needsProfile]);
+  if (needsProfile && !onboarding) setOnboarding(true);
   const showOnboarding = needsProfile || onboarding;
 
   // lock after the app has been in the background longer than the auto-lock delay

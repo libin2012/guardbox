@@ -34,9 +34,9 @@ export default function ProfileScreen() {
   const errors: ProfileErrors = { fullName: show('fullName'), email: show('email'), mobile: show('mobile') };
   const blur = (k: keyof ProfileErrors) => () => setTouched((x) => ({ ...x, [k]: true }));
   const shownKey = `${errors.fullName ?? ''}|${errors.email ?? ''}|${errors.mobile ?? ''}`;
-  const lastShown = useRef(shownKey);
-  if (lastShown.current !== shownKey) {
-    lastShown.current = shownKey;
+  const [lastShown, setLastShown] = useState(shownKey);
+  if (lastShown !== shownKey) {
+    setLastShown(shownKey);
     animateLayout();
   }
 

@@ -31,7 +31,6 @@ const BEHAVIOURS: Record<Kind, Option[]> = {
 };
 
 export default function Categories() {
-  const t = useTheme();
   const data = useStore((s) => s.data);
   const [kind, setKind] = useState<Kind>('asset');
   const [editing, setEditing] = useState<Category | 'new' | null>(null);

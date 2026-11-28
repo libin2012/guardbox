@@ -9,7 +9,10 @@ import { useStore } from '../../lib/store';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const tab = (icon: IconName) => ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={icon} size={size} color={color as string} />;
+const tab = (icon: IconName) =>
+  function TabIcon({ color, size }: { color: ColorValue; size: number }) {
+    return <Ionicons name={icon} size={size} color={color as string} />;
+  };
 
 export default function TabsLayout() {
   const t = useTheme();
