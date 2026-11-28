@@ -3,7 +3,8 @@ import { create } from 'zustand';
 import { withHistoryPoint, withSnapshot, holdingValue } from './calc';
 import { emptyData } from './defaults';
 import { newId } from './id';
-import { AppData, BackupFile, Category, FxRates, Holding, Settings } from './types';
+import { isCompleteProfile } from './profile';
+import { AppData, BackupFile, Category, FxRates, Holding, Profile, Settings } from './types';
 
 const STORAGE_KEY = 'guardbox:data:v1';
 
@@ -21,6 +22,7 @@ interface Store {
   updateCategory(id: string, patch: Partial<Omit<Category, 'id' | 'kind'>>): void;
   deleteCategory(id: string): boolean;
   updateSettings(patch: Partial<Settings>): void;
+  setProfile(p: Profile): void;
   setFx(fx: FxRates): void;
   restoreBackup(b: BackupFile): void;
   resetAll(): void;
@@ -56,6 +58,7 @@ function migrate(raw: unknown): AppData {
     categories,
     holdings: Array.isArray(d.holdings) ? d.holdings.map((h) => ({ ...h, history: h.history ?? [] })) : [],
     snapshots: Array.isArray(d.snapshots) ? d.snapshots : [],
+    profile: isCompleteProfile(d.profile) ? d.profile : undefined,
     settings: { ...base.settings, ...(d.settings ?? {}) },
     fx: d.fx?.rates ? { rates: { ...base.fx.rates, ...d.fx.rates }, updatedAt: d.fx.updatedAt } : base.fx,
   };
@@ -146,6 +149,10 @@ export const useStore = create<Store>((set, get) => {
       persist(next);
     },
 
+    setProfile(p) {
+      commit({ ...get().data, profile: p });
+    },
+
     setFx(fx) {
       const d = get().data;
       commit({ ...d, fx: { rates: { ...d.fx.rates, ...fx.rates }, updatedAt: fx.updatedAt } }, false);
@@ -154,6 +161,8 @@ export const useStore = create<Store>((set, get) => {
     restoreBackup(b) {
       const d = get().data;
       const restored = migrate({ ...b.data, settings: { ...d.settings, baseCurrency: b.data.settings.baseCurrency } });
+      // the profile typed on this device wins; older backups have none
+      restored.profile = d.profile ?? restored.profile;
       restored.modifiedAt = b.data.modifiedAt;
       set({ data: restored });
       persist(restored);
@@ -162,6 +171,8 @@ export const useStore = create<Store>((set, get) => {
     resetAll() {
       const fresh = emptyData();
       fresh.settings = { ...get().data.settings, syncProvider: 'none', lastSyncAt: undefined };
+      // erasing wealth data keeps who you are, so onboarding does not run again
+      fresh.profile = get().data.profile;
       commit(fresh);
     },
   };

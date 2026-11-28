@@ -6,10 +6,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LockScreen, PrivacyCover } from '../components/LockScreen';
+import { Onboarding } from '../components/Onboarding';
 import { useTheme } from '../components/theme';
 import { usePendingImport } from '../lib/epf/pending';
 import { isEpfReminderResponse, scheduleEpfReminder } from '../lib/epf/reminder';
 import { refreshIfStale } from '../lib/refresh';
+import { isCompleteProfile } from '../lib/profile';
 import { hasPasscode, useLock } from '../lib/security';
 import { onDataChanged, useStore } from '../lib/store';
 import { syncNow } from '../lib/sync';
@@ -21,7 +23,10 @@ export default function RootLayout() {
   const load = useStore((s) => s.load);
   const lockEnabled = useStore((s) => s.data.settings.lockEnabled);
   const { locked, lock, unlock } = useLock();
+  const hasProfile = useStore((s) => isCompleteProfile(s.data.profile));
   const [covered, setCovered] = useState(false);
+  // stays true through the onboarding exit animation, after the profile is saved
+  const [onboarding, setOnboarding] = useState(false);
   const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -56,8 +61,13 @@ export default function RootLayout() {
   const navReady = !!useRootNavigationState()?.key;
   const pending = usePendingImport((s) => s.pending);
   const unlocked = ready && !(lockEnabled && locked);
+  const needsProfile = unlocked && !hasProfile;
   useEffect(() => {
-    if (!unlocked || !navReady || !pending) return;
+    if (needsProfile) setOnboarding(true);
+  }, [needsProfile]);
+  const showOnboarding = needsProfile || onboarding;
+  useEffect(() => {
+    if (!unlocked || showOnboarding || !navReady || !pending) return;
     // let the stack finish mounting (it is replaced by the lock screen while locked)
     const timer = setTimeout(() => {
       const p = usePendingImport.getState().take();
@@ -65,7 +75,7 @@ export default function RootLayout() {
       router.push(p.file ? { pathname: '/epf-import', params: { file: p.file } } : '/epf-import');
     }, 100);
     return () => clearTimeout(timer);
-  }, [unlocked, navReady, pending]);
+  }, [unlocked, showOnboarding, navReady, pending]);
 
   // lock after the app has been in the background longer than the auto-lock delay
   useEffect(() => {
@@ -114,6 +124,9 @@ export default function RootLayout() {
           <LockScreen />
         ) : (
           <>
+            {/* Order on launch: lock screen (if a passcode is set) → onboarding (until a profile exists) → app.
+                The app mounts under onboarding so it is ready the moment onboarding fades out. */}
+            <View style={{ flex: 1 }} accessibilityElementsHidden={showOnboarding} importantForAccessibility={showOnboarding ? 'no-hide-descendants' : 'auto'}>
             <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal', headerTintColor: t.brand, headerTitleStyle: { color: t.text } }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="holding/edit" options={{ presentation: 'modal', title: 'Holding' }} />
@@ -122,7 +135,10 @@ export default function RootLayout() {
               <Stack.Screen name="sync" options={{ title: 'Backup & sync' }} />
               <Stack.Screen name="passcode" options={{ presentation: 'modal', title: 'Passcode' }} />
               <Stack.Screen name="epf-import" options={{ title: 'EPF passbook' }} />
+              <Stack.Screen name="profile" options={{ title: 'Profile' }} />
             </Stack>
+            </View>
+            {showOnboarding ? <Onboarding onDone={() => setOnboarding(false)} /> : null}
             {covered ? <PrivacyCover /> : null}
           </>
         )}
