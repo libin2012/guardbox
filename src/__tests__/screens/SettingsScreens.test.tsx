@@ -9,6 +9,8 @@ import Categories from '../../app/categories';
 import PasscodeScreen from '../../app/passcode';
 import SyncScreen from '../../app/sync';
 import { decryptBackup, encryptBackup } from '../../lib/backupCrypto';
+import { loadConfig } from '../../lib/sync';
+import { icloudProvider } from '../../lib/sync/icloud';
 import { emptyData } from '../../lib/defaults';
 import { clearPasscode, hasPasscode, setPasscode, useLock, verifyPasscode } from '../../lib/security';
 import { toBackup, useStore } from '../../lib/store';
@@ -334,6 +336,44 @@ describe('Backup & sync screen', () => {
     expect(await screen.findByText('Firebase settings')).toBeOnTheScreen();
     expect(screen.getByText('Web API key')).toBeOnTheScreen();
     expect(screen.getByText('Create account')).toBeOnTheScreen();
+  });
+
+  it('asks every provider, iCloud included, for an encryption passphrase', async () => {
+    seedStore();
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('iCloud'));
+    expect(await screen.findByText('iCloud settings')).toBeOnTheScreen();
+    expect(screen.getByText('Encryption passphrase')).toBeOnTheScreen();
+    expect(screen.getByText(/encrypted on this phone with the passphrase before upload/)).toBeOnTheScreen();
+  });
+
+  it('will not turn sync on without a passphrase of 8+ characters', async () => {
+    seedStore();
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('iCloud'));
+    await fireEvent.changeText(await screen.findByPlaceholderText('At least 8 characters'), 'short');
+    await fireEvent.press(screen.getByText('Save & sync now'));
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Save failed', 'Encryption passphrase: Use at least 8 characters.'));
+    expect(state().settings.syncProvider).toBe('none');
+  });
+
+  it('saves the passphrase with the provider settings and warns about an unencrypted cloud copy', async () => {
+    seedStore({ modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const remote = { ...toBackup({ ...emptyData(), holdings: [makeHolding({ name: 'Old upload' })] }), exportedAt: '2026-01-02T00:00:00.000Z' };
+    const pull = jest.spyOn(icloudProvider, 'pull').mockResolvedValue(remote);
+    const push = jest.spyOn(icloudProvider, 'push').mockResolvedValue();
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('iCloud'));
+    await fireEvent.changeText(await screen.findByPlaceholderText('At least 8 characters'), 'long enough pass');
+    await fireEvent.press(screen.getByText('Save & sync now'));
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Unencrypted cloud copy', expect.stringContaining('not encrypted'), expect.any(Array)), { timeout: 5000 });
+    expect((await loadConfig('icloud')).passphrase).toBe('long enough pass');
+    expect(push).not.toHaveBeenCalled();
+    await pressAlertButton('Keep this phone');
+    await waitFor(() => expect(push).toHaveBeenCalled(), { timeout: 5000 });
+    expect(push.mock.calls[0][1]).toMatchObject({ encrypted: 1 });
+    pull.mockRestore();
+    push.mockRestore();
   });
 
   it('turns sync off', async () => {

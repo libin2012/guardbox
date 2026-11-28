@@ -4,7 +4,7 @@
  * presigned with a small built-in SigV4 signer and sent with fetch, so no AWS SDK or Node polyfills are needed.
  * Object key: private/{identityId}/guardbox-backup.json
  */
-import { parseBackup } from '../store';
+import { parseSyncPayload } from '../backupCrypto';
 import { presignS3 } from './sigv4';
 import { errorMessage, ProviderConfig, required, SyncProvider } from './types';
 
@@ -71,10 +71,10 @@ export const awsProvider: SyncProvider = {
   label: 'AWS',
   description: 'Amazon Cognito sign-in + a private S3 object per user. Fits in the AWS free tier.',
   fields,
-  async push(cfg, backup) {
+  async push(cfg, payload) {
     const s = await signIn(cfg);
     const url = presign(cfg, s, 'PUT');
-    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(backup) });
+    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) throw new Error(`S3 upload failed (HTTP ${res.status})`);
   },
   async pull(cfg) {
@@ -86,6 +86,6 @@ export const awsProvider: SyncProvider = {
       if (res.status === 404 || body.includes('NoSuchKey') || body.includes('AccessDenied')) return null;
     }
     if (!res.ok) throw new Error(`S3 download failed (HTTP ${res.status})`);
-    return parseBackup(await res.text());
+    return parseSyncPayload(await res.text());
   },
 };

@@ -2,7 +2,7 @@
 
 GuardBox keeps everything on your phone unless you turn on sync. Each provider below uses **your own** free-tier project, so your data never touches a server you don't control. Credentials are saved in the iOS Keychain on the device, never inside backups.
 
-Sync stores one backup document per user. When both the phone and the cloud changed since the last sync, GuardBox asks which copy to keep.
+Sync stores one backup document per user, **end-to-end encrypted** on the phone with an encryption passphrase you choose in Backup & sync (use the same one on every device). The provider only ever stores ciphertext. When both the phone and the cloud changed since the last sync, GuardBox asks which copy to keep.
 
 ## iCloud
 

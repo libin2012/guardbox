@@ -29,6 +29,7 @@ Built with **React Native + Expo (SDK 58) + TypeScript**, so the same code runs 
   - Export / import a backup file (save it to iCloud Drive, Google Drive or Files), optionally encrypted with a passphrase.
   - **iCloud** sync (private iCloud Drive container).
   - **Firebase**, **Supabase** or **AWS** (Cognito + S3), each using your own project. See [SYNC_SETUP.md](SYNC_SETUP.md).
+  - Cloud sync is end-to-end encrypted with your own passphrase: the provider only stores ciphertext.
   - Two-way sync with conflict detection: if both the phone and the cloud changed, you choose which copy to keep.
 - Light and dark mode. No bank linking, no ads, no paywall.
 

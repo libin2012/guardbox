@@ -2,8 +2,8 @@
  * Supabase via REST (GoTrue auth + PostgREST). No SDK needed.
  * Table: public.guardbox_backups (user_id uuid pk, data jsonb, updated_at timestamptz) with RLS.
  */
-import { BackupFile } from '../types';
-import { errorMessage, postJson, ProviderConfig, required, SyncProvider } from './types';
+import type { SyncPayload } from '../backupCrypto';
+import { errorMessage, payloadTime, postJson, ProviderConfig, required, SyncProvider } from './types';
 
 const fields = [
   { key: 'url', label: 'Project URL', placeholder: 'https://xyz.supabase.co' },
@@ -28,7 +28,7 @@ export const supabaseProvider: SyncProvider = {
     required(cfg, fields);
     await postJson(`${base(cfg)}/auth/v1/signup`, { email: cfg.email.trim(), password: cfg.password }, { apikey: cfg.anonKey });
   },
-  async push(cfg, backup) {
+  async push(cfg, payload) {
     const s = await signIn(cfg);
     const res = await fetch(`${base(cfg)}/rest/v1/guardbox_backups?on_conflict=user_id`, {
       method: 'POST',
@@ -38,7 +38,7 @@ export const supabaseProvider: SyncProvider = {
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
-      body: JSON.stringify({ user_id: s.user.id, data: backup, updated_at: backup.exportedAt }),
+      body: JSON.stringify({ user_id: s.user.id, data: payload, updated_at: payloadTime(payload) }),
     });
     if (!res.ok) throw new Error(errorMessage(await res.json().catch(() => null)) ?? `Supabase HTTP ${res.status}`);
   },
@@ -50,6 +50,6 @@ export const supabaseProvider: SyncProvider = {
     const json = await res.json();
     if (!res.ok) throw new Error(errorMessage(json) ?? `Supabase HTTP ${res.status}`);
     const row = Array.isArray(json) ? json[0] : null;
-    return row ? (row.data as BackupFile) : null;
+    return row ? (row.data as SyncPayload) : null;
   },
 };
