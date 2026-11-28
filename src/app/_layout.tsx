@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, View } from 'react-native';
@@ -11,6 +11,7 @@ import { useScheme, useTheme } from '../components/theme';
 import { refreshIfStale } from '../lib/refresh';
 import { isCompleteProfile } from '../lib/profile';
 import { hasPasscode, useLock } from '../lib/security';
+import { usePendingImport } from '../lib/pendingImport';
 import { onDataChanged, useStore } from '../lib/store';
 import { syncNow } from '../lib/sync';
 
@@ -47,6 +48,15 @@ export default function RootLayout() {
   const needsProfile = unlocked && !hasProfile;
   if (needsProfile && !onboarding) setOnboarding(true);
   const showOnboarding = needsProfile || onboarding;
+
+  // A tapped .gbox file waits here until the app is unlocked and past onboarding,
+  // then the restore screen takes over — so opening a file never bypasses the lock.
+  const pendingImport = usePendingImport((s) => s.uri);
+  useEffect(() => {
+    if (ready && unlocked && !showOnboarding && !storageError && pendingImport) {
+      router.push('/restore-backup');
+    }
+  }, [ready, unlocked, showOnboarding, storageError, pendingImport]);
 
   // lock after the app has been in the background longer than the auto-lock delay
   useEffect(() => {
@@ -108,6 +118,7 @@ export default function RootLayout() {
               <Stack.Screen name="sync" options={{ title: 'Backup & sync' }} />
               <Stack.Screen name="passcode" options={{ presentation: 'modal', title: 'Passcode' }} />
               <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+              <Stack.Screen name="restore-backup" options={{ presentation: 'modal', title: 'Restore Backup' }} />
             </Stack>
             </View>
             {showOnboarding ? <Onboarding onDone={() => setOnboarding(false)} /> : null}

@@ -6,11 +6,12 @@ import { Alert, Platform, ScrollView, View } from 'react-native';
 import { OptionSheet } from '../components/OptionSheet';
 import { space, useTheme } from '../components/theme';
 import { IconName, IconTile, ListInput, ListRow, ListSection, ListSwitch, T } from '../components/ui';
-import { checkPassphrase, decryptBackup, encryptBackup, isEncryptedBackup } from '../lib/backupCrypto';
+import { checkPassphrase, encryptBackup } from '../lib/backupCrypto';
 import { backupToDrive, listDriveBackups, openDriveBackup } from '../lib/driveBackup';
 import { formatBytes, relativeTime } from '../lib/format';
 import { connectGoogle, disconnectGoogle, DriveFile, getGoogleAccount, GoogleAccount, GoogleNotConnectedError } from '../lib/google';
-import { parseBackup, toBackup, useStore } from '../lib/store';
+import { needsPassphrase, openEncryptedBackup, openPlainBackup, readBackupText } from '../lib/restore';
+import { toBackup, useStore } from '../lib/store';
 import { getProvider, loadConfig, PASSPHRASE_FIELD, PROVIDERS, ProviderConfig, saveConfig, syncNow } from '../lib/sync';
 import { BackupFile, SyncProviderId } from '../lib/types';
 
@@ -101,7 +102,9 @@ export default function SyncScreen() {
     run('Export', async () => {
       const backup = toBackup(data);
       const text = passphrase ? await encryptBackup(backup, passphrase) : JSON.stringify(backup, null, 2);
-      const name = `GuardBox-backup-${new Date().toISOString().slice(0, 10)}${passphrase ? '-encrypted' : ''}.json`;
+      // date + time (UTC, filesystem-safe), e.g. GuardBox-backup-2026-11-28-143052.gbox
+      const stamp = new Date().toISOString().slice(0, 19).replace('T', '-').replace(/:/g, '');
+      const name = `GuardBox-backup-${stamp}${passphrase ? '-encrypted' : ''}.gbox`;
       if (Platform.OS === 'web') {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -114,7 +117,9 @@ export default function SyncScreen() {
       file.create();
       await file.write(text);
       try {
-        await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Save GuardBox backup' });
+        // No mimeType: on iOS a MIME fallback would append its own extension (e.g. .json)
+        // because no MIME type maps to .gbox. Only the registered UTI yields a clean .gbox.
+        await Sharing.shareAsync(file.uri, { UTI: 'com.guardbox.backup', dialogTitle: 'Save GuardBox backup' });
       } finally {
         // do not leave a copy in the app's cache once it has been shared
         if (file.exists) file.delete();
@@ -133,11 +138,11 @@ export default function SyncScreen() {
 
   const importFile = () =>
     run('Import', async () => {
-      const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'public.json', '*/*'], copyToCacheDirectory: true });
+      const r = await DocumentPicker.getDocumentAsync({ type: ['com.guardbox.backup', 'application/json', 'public.json', '*/*'], copyToCacheDirectory: true });
       if (r.canceled || !r.assets?.[0]) return;
-      const text = Platform.OS === 'web' ? await (await fetch(r.assets[0].uri)).text() : await new File(r.assets[0].uri).text();
-      if (!isEncryptedBackup(text)) return confirmRestore(parseBackup(text));
-      askPassphrase((passphrase) => run('Import', async () => confirmRestore(await decryptBackup(text, passphrase))));
+      const text = await readBackupText(r.assets[0].uri);
+      if (!needsPassphrase(text)) return confirmRestore(openPlainBackup(text));
+      askPassphrase((passphrase) => run('Import', async () => confirmRestore(await openEncryptedBackup(text, passphrase))));
     });
 
   // ---------- Google Drive ----------

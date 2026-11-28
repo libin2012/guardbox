@@ -65,6 +65,27 @@ const config: ExpoConfig = {
     infoPlist: {
       NSFaceIDUsageDescription: 'GuardBox uses Face ID to keep your finances private.',
       ITSAppUsesNonExemptEncryption: false,
+      // Own the .gbox backup type so tapping one offers to restore it in GuardBox.
+      // The file is JSON, so the exported UTI conforms to public.json.
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'GuardBox Backup',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Owner',
+          LSItemContentTypes: ['com.guardbox.backup'],
+        },
+      ],
+      UTExportedTypeDeclarations: [
+        {
+          UTTypeIdentifier: 'com.guardbox.backup',
+          UTTypeDescription: 'GuardBox Backup',
+          UTTypeConformsTo: ['public.json', 'public.data'],
+          UTTypeTagSpecification: {
+            'public.filename-extension': ['gbox'],
+            'public.mime-type': ['application/json'],
+          },
+        },
+      ],
     },
   },
   android: {
@@ -74,6 +95,19 @@ const config: ExpoConfig = {
       foregroundImage: './assets/android-icon-foreground.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
+    // Open .gbox backups from the Files app, email attachments, etc.
+    intentFilters: [
+      {
+        action: 'VIEW',
+        category: ['DEFAULT', 'BROWSABLE'],
+        data: [
+          { scheme: 'content', mimeType: 'application/json' },
+          { scheme: 'file', mimeType: 'application/json' },
+          { scheme: 'content', pathPattern: '.*\\.gbox' },
+          { scheme: 'file', pathPattern: '.*\\.gbox' },
+        ],
+      },
+    ],
   },
   web: { favicon: './assets/favicon.png' },
   plugins,

@@ -256,8 +256,9 @@ describe('Backup & sync screen', () => {
     await pressAlertButton('Export without encryption');
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled());
     const [uri, opts] = (Sharing.shareAsync as jest.Mock).mock.calls[0];
-    expect(uri).toMatch(/^file:\/\/\/cache\/GuardBox-backup-\d{4}-\d{2}-\d{2}\.json$/);
-    expect(opts).toMatchObject({ mimeType: 'application/json', UTI: 'public.json' });
+    expect(uri).toMatch(/^file:\/\/\/cache\/GuardBox-backup-\d{4}-\d{2}-\d{2}-\d{6}\.gbox$/);
+    expect(opts).toMatchObject({ UTI: 'com.guardbox.backup' });
+    expect(opts.mimeType).toBeUndefined();
     const written = JSON.parse(seen[0].text);
     expect(written.app).toBe('GuardBox');
     expect(written.data.holdings[0].name).toBe('Flat');
@@ -276,7 +277,7 @@ describe('Backup & sync screen', () => {
     expect(prompt).toHaveBeenLastCalledWith('Type it again', undefined, expect.any(Array), 'secure-text');
     await answerPrompt('Continue', 'long enough pass');
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled(), { timeout: 5000 });
-    expect(seen[0].uri).toMatch(/-encrypted\.json$/);
+    expect(seen[0].uri).toMatch(/-encrypted\.gbox$/);
     expect(seen[0].text).not.toContain('Flat');
     const restored = await decryptBackup(seen[0].text, 'long enough pass');
     expect(restored.data.holdings[0].name).toBe('Flat');
