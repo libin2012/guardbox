@@ -50,3 +50,19 @@ export function errorMessage(json: unknown): string | undefined {
 export function payloadTime(p: SyncPayload): string {
   return 'exportedAt' in p ? p.exportedAt : new Date().toISOString();
 }
+
+const TIMEOUT_MS = 30000;
+
+/** fetch with a timeout, so a dead connection fails with a readable message instead of hanging. */
+export async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = TIMEOUT_MS): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    if (ctrl.signal.aborted) throw new Error(`${new URL(url).host} did not answer in time. Check your connection and try again.`);
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}

@@ -238,7 +238,7 @@ export const useStore = create<Store>((set, get) => {
 
     resetAll() {
       const fresh = emptyData();
-      fresh.settings = { ...get().data.settings, syncProvider: 'none', lastSyncAt: undefined };
+      fresh.settings = { ...get().data.settings, syncProvider: 'none', lastSyncAt: undefined, lastDriveBackupAt: undefined };
       // erasing wealth data keeps who you are, so onboarding does not run again
       fresh.profile = get().data.profile;
       commit(fresh);
