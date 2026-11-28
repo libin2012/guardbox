@@ -55,3 +55,11 @@ beforeEach(() => {
     throw new Error(`Unexpected network call in test: ${String(url)}`);
   }) as unknown as typeof fetch;
 });
+
+// Saves are debounced and encrypted asynchronously. Finish (or drop) them after
+// each test so one test's write can never land in the next test's storage.
+afterEach(async () => {
+  const store = jest.requireActual<typeof import('./src/lib/store')>('./src/lib/store');
+  store.cancelScheduledSave();
+  await store.whenSaved();
+});

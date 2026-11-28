@@ -25,17 +25,18 @@ async function hashPasscode(code: string, salt: string): Promise<string> {
   return h;
 }
 
-async function secureGet(key: string): Promise<string | null> {
+/** Keychain on iOS (this device only, readable while unlocked); localStorage on the web preview. */
+export async function secureGet(key: string): Promise<string | null> {
   if (Platform.OS === 'web') return globalThis.localStorage?.getItem(key) ?? null;
   return SecureStore.getItemAsync(key);
 }
 
-async function secureSet(key: string, value: string): Promise<void> {
+export async function secureSet(key: string, value: string): Promise<void> {
   if (Platform.OS === 'web') return void globalThis.localStorage?.setItem(key, value);
   await SecureStore.setItemAsync(key, value, { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY });
 }
 
-async function secureDelete(key: string): Promise<void> {
+export async function secureDelete(key: string): Promise<void> {
   if (Platform.OS === 'web') return void globalThis.localStorage?.removeItem(key);
   await SecureStore.deleteItemAsync(key);
 }

@@ -5,9 +5,10 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { space, useTheme } from '../components/theme';
 import { Button, Card, Divider, Field, Row, Screen, SectionTitle, T, ToggleRow } from '../components/ui';
+import { checkPassphrase, decryptBackup, encryptBackup, isEncryptedBackup } from '../lib/backupCrypto';
 import { parseBackup, toBackup, useStore } from '../lib/store';
 import { getProvider, loadConfig, PROVIDERS, ProviderConfig, saveConfig, syncNow } from '../lib/sync';
-import { SyncProviderId } from '../lib/types';
+import { BackupFile, SyncProviderId } from '../lib/types';
 
 const ICONS: Record<string, any> = { icloud: 'cloud-outline', firebase: 'flame-outline', supabase: 'server-outline', aws: 'logo-amazon' };
 
@@ -60,13 +61,14 @@ export default function SyncScreen() {
     }
   };
 
-  const exportFile = () =>
+  const writeExport = (passphrase: string | null) =>
     run('Export', async () => {
-      const json = JSON.stringify(toBackup(data), null, 2);
-      const name = `GuardBox-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const backup = toBackup(data);
+      const text = passphrase ? await encryptBackup(backup, passphrase) : JSON.stringify(backup, null, 2);
+      const name = `GuardBox-backup-${new Date().toISOString().slice(0, 10)}${passphrase ? '-encrypted' : ''}.json`;
       if (Platform.OS === 'web') {
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
         a.download = name;
         a.click();
         return;
@@ -74,32 +76,74 @@ export default function SyncScreen() {
       const file = new File(Paths.cache, name);
       if (file.exists) file.delete();
       file.create();
-      await file.write(json);
-      await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Save GuardBox backup' });
+      await file.write(text);
+      try {
+        await Sharing.shareAsync(file.uri, { mimeType: 'application/json', UTI: 'public.json', dialogTitle: 'Save GuardBox backup' });
+      } finally {
+        // do not leave a copy in the app's cache once it has been shared
+        if (file.exists) file.delete();
+      }
     });
+
+  const askNewPassphrase = () =>
+    Alert.prompt(
+      'Choose a passphrase',
+      'You will need it to restore this backup. GuardBox cannot recover a forgotten passphrase.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Next',
+          onPress: (first?: string) => {
+            const problem = checkPassphrase(first ?? '');
+            if (problem) return Alert.alert('Passphrase too short', problem);
+            Alert.prompt('Type it again', undefined, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Export', onPress: (second?: string) => (second === first ? writeExport(first!) : Alert.alert('Passphrases do not match', 'Nothing was exported. Try again.')) },
+            ], 'secure-text');
+          },
+        },
+      ],
+      'secure-text',
+    );
+
+  const exportFile = () => {
+    // the web preview has no secure prompt; it exports plain JSON
+    if (Platform.OS === 'web') return writeExport(null);
+    Alert.alert('Protect this backup?', 'An encrypted backup can only be opened with your passphrase. A plain backup can be read by anyone who gets the file.', [
+      { text: 'Encrypt with passphrase', onPress: askNewPassphrase },
+      { text: 'Export without encryption', onPress: () => writeExport(null) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const confirmRestore = (backup: BackupFile) =>
+    Alert.alert('Restore this backup?', `${backup.data.holdings.length} items from ${new Date(backup.exportedAt).toLocaleString()}. This replaces the data on this device.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restore', style: 'destructive', onPress: () => restoreBackup(backup) },
+    ]);
 
   const importFile = () =>
     run('Import', async () => {
       const r = await DocumentPicker.getDocumentAsync({ type: ['application/json', 'public.json', '*/*'], copyToCacheDirectory: true });
       if (r.canceled || !r.assets?.[0]) return;
       const text = Platform.OS === 'web' ? await (await fetch(r.assets[0].uri)).text() : await new File(r.assets[0].uri).text();
-      const backup = parseBackup(text);
-      Alert.alert('Restore this backup?', `${backup.data.holdings.length} items from ${new Date(backup.exportedAt).toLocaleString()}. This replaces the data on this device.`, [
+      if (!isEncryptedBackup(text)) return confirmRestore(parseBackup(text));
+      Alert.prompt('Enter the passphrase', 'This backup is encrypted.', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Restore', style: 'destructive', onPress: () => restoreBackup(backup) },
-      ]);
+        { text: 'Open', onPress: (passphrase?: string) => run('Import', async () => confirmRestore(await decryptBackup(text, passphrase ?? ''))) },
+      ], 'secure-text');
     });
 
   return (
     <Screen>
       <Card style={{ gap: space(2) }}>
         <T weight="700">Your data lives on this device</T>
-        <T muted size={13}>Everything is stored locally. Turn on a cloud provider below to back up and sync between devices. Provider passwords and keys are kept in the iOS Keychain, never in backups.</T>
+        <T muted size={13}>Everything is stored locally and encrypted with AES-256 using a key kept in the iOS Keychain. Turn on a cloud provider below to back up and sync between devices. Provider passwords and keys are kept in the iOS Keychain, never in backups.</T>
       </Card>
 
       <SectionTitle>Backup file</SectionTitle>
       <Card style={{ gap: space(3) }}>
-        <T muted size={13}>Export a backup file and save it to iCloud Drive, Google Drive or anywhere in the Files app. Works on every build, no setup.</T>
+        <T muted size={13}>Export a backup file and save it to iCloud Drive, Google Drive or anywhere in the Files app. Protect it with a passphrase so only you can open it. Works on every build, no setup.</T>
         <View style={{ flexDirection: 'row', gap: space(3) }}>
           <Button title="Export" icon="share-outline" onPress={exportFile} loading={busy === 'Export'} style={{ flex: 1 }} />
           <Button title="Import" icon="download-outline" variant="secondary" onPress={importFile} loading={busy === 'Import'} style={{ flex: 1 }} />

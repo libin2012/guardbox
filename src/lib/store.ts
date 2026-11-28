@@ -5,15 +5,22 @@ import { emptyData } from './defaults';
 import { newId } from './id';
 import { isCompleteProfile } from './profile';
 import { AppData, BackupFile, Category, FxRates, Holding, Profile, Settings } from './types';
+import { deleteDataKey, getDataKey, isSealed, openString, sealString, VaultError, VaultErrorCode } from './vault';
 
 const STORAGE_KEY = 'guardbox:data:v1';
+/** Additional authenticated data: a sealed blob only opens as GuardBox app data. */
+const DATA_AAD = 'guardbox:data:v1';
 
 type HoldingInput = Omit<Holding, 'id' | 'createdAt' | 'updatedAt' | 'history'>;
 
 interface Store {
   ready: boolean;
   data: AppData;
+  /** Set when saved data exists but could not be opened. Nothing is saved until it is resolved. */
+  storageError?: VaultErrorCode;
   load(): Promise<void>;
+  /** Delete unreadable saved data and its key. Call load() afterwards to start fresh. */
+  eraseUnreadableData(): Promise<void>;
   addHolding(input: HoldingInput): string;
   updateHolding(id: string, patch: Partial<HoldingInput>): void;
   deleteHolding(id: string): void;
@@ -29,6 +36,7 @@ interface Store {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingWrite: Promise<void> = Promise.resolve();
 const changeListeners = new Set<() => void>();
 
 /** Subscribe to user-driven data changes (used for auto sync). */
@@ -37,11 +45,56 @@ export function onDataChanged(fn: () => void): () => void {
   return () => changeListeners.delete(fn);
 }
 
+/** Encrypt and write. Every save gets a fresh IV. */
+async function writeEncrypted(data: AppData): Promise<void> {
+  const key = await getDataKey(true);
+  await AsyncStorage.setItem(STORAGE_KEY, sealString(JSON.stringify(data), key!, DATA_AAD));
+}
+
 function persist(data: AppData) {
+  // unreadable data stays on disk untouched until the user decides what to do
+  if (useStore.getState().storageError) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch((e) => console.warn('save failed', e));
+    saveTimer = null;
+    pendingWrite = pendingWrite.then(() => writeEncrypted(data)).catch((e) => console.warn('save failed', e));
   }, 250);
+}
+
+/** Drop a save that is scheduled but not started (tests, and before erasing). */
+export function cancelScheduledSave(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+}
+
+/** Resolves once the latest started write has reached storage. */
+export function whenSaved(): Promise<void> {
+  return pendingWrite;
+}
+
+/**
+ * Read and decrypt saved data. Older versions saved plain JSON; that is
+ * returned with `legacy` so the caller re-saves it encrypted.
+ */
+async function readStored(): Promise<{ raw: unknown; legacy: boolean }> {
+  await pendingWrite;
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored == null) return { raw: null, legacy: false };
+  if (isSealed(stored)) {
+    const key = await getDataKey(false);
+    if (!key) throw new VaultError('key-missing', 'The encryption key for this data is not on this device.');
+    try {
+      return { raw: JSON.parse(openString(stored, key, DATA_AAD)), legacy: false };
+    } catch (e) {
+      if (e instanceof VaultError) throw e;
+      throw new VaultError('corrupt', 'The saved data could not be read.');
+    }
+  }
+  try {
+    return { raw: JSON.parse(stored), legacy: true };
+  } catch {
+    throw new VaultError('corrupt', 'The saved data could not be read.');
+  }
 }
 
 function migrate(raw: unknown): AppData {
@@ -80,14 +133,29 @@ export const useStore = create<Store>((set, get) => {
 
     async load() {
       try {
-        const json = await AsyncStorage.getItem(STORAGE_KEY);
-        const data = migrate(json ? JSON.parse(json) : null);
+        const { raw, legacy } = await readStored();
+        // make the key now so the first save never has to wait on the keychain
+        await getDataKey(true);
+        const data = migrate(raw);
         data.snapshots = withSnapshot(data);
-        set({ data, ready: true });
+        set({ data, ready: true, storageError: undefined });
+        if (legacy) {
+          // one-time upgrade: replace the plain-text copy with an encrypted one
+          pendingWrite = pendingWrite.then(() => writeEncrypted(data)).catch((e) => console.warn('encrypting saved data failed', e));
+          await pendingWrite;
+        }
       } catch (e) {
         console.warn('load failed', e);
-        set({ ready: true });
+        set({ data: emptyData(), ready: true, storageError: e instanceof VaultError ? e.code : 'unavailable' });
       }
+    },
+
+    async eraseUnreadableData() {
+      cancelScheduledSave();
+      await pendingWrite;
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      await deleteDataKey();
+      set({ data: emptyData(), storageError: undefined, ready: false });
     },
 
     addHolding(input) {
