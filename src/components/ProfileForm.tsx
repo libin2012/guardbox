@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Animated, Easing, LayoutAnimation, Platform, StyleSheet, Text, TextInput, TextInputInstance, TextInputProps, View } from 'react-native';
 import { initials } from '../lib/profile';
 import { radius, space, useTheme } from './theme';
@@ -24,7 +24,7 @@ export function animateLayout() {
 
 /** A short horizontal shake for a field that failed validation. */
 export function useShake() {
-  const x = useRef(new Animated.Value(0)).current;
+  const [x] = useState(() => new Animated.Value(0));
   const shake = useCallback(() => {
     x.setValue(0);
     Animated.sequence(
@@ -39,7 +39,7 @@ export function useShake() {
  * style per block.
  */
 export function useEntrance(count: number, delay = 70) {
-  const values = useRef(Array.from({ length: count }, () => new Animated.Value(0))).current;
+  const [values] = useState(() => Array.from({ length: count }, () => new Animated.Value(0)));
   useEffect(() => {
     Animated.stagger(
       delay,

@@ -13,6 +13,7 @@ function cloud(): CloudStore {
     throw new Error('This build has iCloud turned off. Rebuild with ENABLE_ICLOUD=1 (needs a paid Apple Developer account), or use Export backup to save a file to iCloud Drive.');
   }
   // required lazily so Android and Expo Go builds never touch the native module
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('react-native-cloud-store') as CloudStore;
 }
 

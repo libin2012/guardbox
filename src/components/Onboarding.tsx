@@ -26,7 +26,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const nameShake = useShake();
   const emailShake = useShake();
   const enter = useEntrance(4);
-  const exit = useRef(new Animated.Value(1)).current;
+  const [exit] = useState(() => new Animated.Value(1));
 
   // raise the keyboard once the entrance has settled, so the two animations don't fight
   useEffect(() => {
@@ -46,9 +46,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     email: submitted || touched.email ? all.email : undefined,
   };
   const shownKey = `${errors.fullName ?? ''}|${errors.email ?? ''}`;
-  const lastShown = useRef(shownKey);
-  if (lastShown.current !== shownKey) {
-    lastShown.current = shownKey;
+  const [lastShown, setLastShown] = useState(shownKey);
+  if (lastShown !== shownKey) {
+    setLastShown(shownKey);
     animateLayout();
   }
 
@@ -99,7 +99,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </Animated.View>
             <Animated.View style={[{ gap: space(2) }, enter[1]]}>
               <T size={30} weight="800">Welcome to GuardBox</T>
-              <T muted size={16}>Let's set up your profile. It stays on this iPhone and is only used inside the app.</T>
+              <T muted size={16}>{"Let's set up your profile. It stays on this iPhone and is only used inside the app."}</T>
             </Animated.View>
             <Animated.View style={[{ gap: space(4) }, enter[2]]}>
               <FormField
