@@ -62,7 +62,7 @@ export function SectionTitle({ children, right }: { children: React.ReactNode; r
 export function Button({ title, onPress, variant = 'primary', icon, loading, disabled, style }: { title: string; onPress: () => void; variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; icon?: IconName; loading?: boolean; disabled?: boolean; style?: StyleProp<ViewStyle> }) {
   const t = useTheme();
   const bg = variant === 'primary' ? t.brand : variant === 'danger' ? t.negative : variant === 'secondary' ? t.cardAlt : 'transparent';
-  const fg = variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'ghost' ? t.brand : t.text;
+  const fg = variant === 'primary' ? t.onBrand : variant === 'danger' ? '#fff' : variant === 'ghost' ? t.brand : t.text;
   return (
     <Pressable
       accessibilityRole="button"

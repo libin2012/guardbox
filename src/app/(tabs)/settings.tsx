@@ -7,7 +7,9 @@ import { Option, OptionSheet } from '../../components/OptionSheet';
 import { Avatar } from '../../components/ProfileForm';
 import { space, useTheme } from '../../components/theme';
 import { Button, Card, Divider, Field, Row, Screen, SectionTitle, T, ToggleRow } from '../../components/ui';
+import { THEME_MODE_LABELS } from '../../lib/appearance';
 import { CURRENCIES } from '../../lib/defaults';
+import type { ThemeMode } from '../../lib/types';
 import { refreshAll } from '../../lib/refresh';
 import { authenticateBiometric, biometricLabel, clearPasscode, hasPasscode } from '../../lib/security';
 import { useStore } from '../../lib/store';
@@ -21,13 +23,20 @@ const AUTO_LOCK: Option[] = [
   { value: '900', label: 'After 15 minutes' },
 ];
 
+const THEME_MODES: Option[] = [
+  { value: 'system', label: THEME_MODE_LABELS.system, subtitle: 'Follow your device appearance' },
+  { value: 'light', label: THEME_MODE_LABELS.light, subtitle: 'Always light' },
+  { value: 'dark', label: THEME_MODE_LABELS.dark, subtitle: 'Always dark' },
+  { value: 'auto', label: THEME_MODE_LABELS.auto, subtitle: 'Light by day, dark from 6 PM to 6 AM' },
+];
+
 export default function Settings() {
   const t = useTheme();
   const data = useStore((s) => s.data);
   const { updateSettings, resetAll } = useStore.getState();
   const s = data.settings;
   const profile = data.profile;
-  const [picker, setPicker] = useState<'currency' | 'autolock' | null>(null);
+  const [picker, setPicker] = useState<'currency' | 'autolock' | 'theme' | null>(null);
   const [bio, setBio] = useState<string | null>(null);
   const [finnhub, setFinnhub] = useState(s.finnhubKey ?? '');
   const [coingecko, setCoingecko] = useState(s.coingeckoKey ?? '');
@@ -76,6 +85,11 @@ export default function Settings() {
         <Row icon="globe-outline" title="Main currency" subtitle="Totals and charts are shown in this currency" right={<T weight="700">{s.baseCurrency}</T>} chevron onPress={() => setPicker('currency')} />
         <Divider />
         <ToggleRow icon="eye-off-outline" title="Hide amounts" subtitle="Mask balances on screen" value={s.hideAmounts} onChange={(v) => updateSettings({ hideAmounts: v })} />
+      </Card>
+
+      <SectionTitle>Appearance</SectionTitle>
+      <Card style={{ paddingVertical: space(1) }}>
+        <Row icon="contrast-outline" title="Theme" subtitle="Light, dark or automatic by time of day" right={<T muted>{THEME_MODE_LABELS[s.themeMode]}</T>} chevron onPress={() => setPicker('theme')} />
       </Card>
 
       <SectionTitle>Security</SectionTitle>
@@ -138,6 +152,7 @@ export default function Settings() {
 
       <OptionSheet visible={picker === 'currency'} title="Main currency" options={currencyOptions} value={s.baseCurrency} onSelect={(c) => updateSettings({ baseCurrency: c })} onClose={() => setPicker(null)} searchable />
       <OptionSheet visible={picker === 'autolock'} title="Auto-lock" options={AUTO_LOCK} value={String(s.autoLockSeconds)} onSelect={(v) => updateSettings({ autoLockSeconds: Number(v) })} onClose={() => setPicker(null)} />
+      <OptionSheet visible={picker === 'theme'} title="Appearance" options={THEME_MODES} value={s.themeMode} onSelect={(v) => updateSettings({ themeMode: v as ThemeMode })} onClose={() => setPicker(null)} />
     </Screen>
   );
 }

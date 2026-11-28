@@ -17,6 +17,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   baseCurrency: 'USD',
+  themeMode: 'auto',
   lockEnabled: false,
   biometricsEnabled: false,
   autoLockSeconds: 30,

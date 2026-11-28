@@ -96,7 +96,7 @@ export default function Holdings() {
         onPress={() => router.push(`/holding/edit?kind=${kind}`)}
         style={({ pressed }) => ({ position: 'absolute', right: space(5), bottom: space(6), width: 58, height: 58, borderRadius: 29, backgroundColor: t.brand, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.85 : 1, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 })}
       >
-        <Ionicons name="add" size={30} color="#fff" />
+        <Ionicons name="add" size={30} color={t.onBrand} />
       </Pressable>
     </View>
   );

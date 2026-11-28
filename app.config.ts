@@ -51,11 +51,17 @@ const config: ExpoConfig = {
   scheme: googleScheme ? ['guardbox', googleScheme] : 'guardbox',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: './assets/iconlight.png',
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: bundleId,
     supportsTablet: false,
+    // Light/dark/tinted app icons (iOS 18+). Each is an opaque, full-bleed 1024² PNG.
+    icon: {
+      light: './assets/iconlight.png',
+      dark: './assets/icondark.png',
+      tinted: './assets/icontinted.png',
+    },
     infoPlist: {
       NSFaceIDUsageDescription: 'GuardBox uses Face ID to keep your finances private.',
       ITSAppUsesNonExemptEncryption: false,
@@ -64,9 +70,8 @@ const config: ExpoConfig = {
   android: {
     package: bundleId,
     adaptiveIcon: {
-      backgroundColor: '#0B1A2B',
+      backgroundColor: '#0A1323',
       foregroundImage: './assets/android-icon-foreground.png',
-      backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
   },

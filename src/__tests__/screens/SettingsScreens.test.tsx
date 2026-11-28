@@ -118,6 +118,19 @@ describe('Settings', () => {
     expect(state().settings.baseCurrency).toBe('INR');
   });
 
+  it('changes the appearance theme from the picker', async () => {
+    seedStore();
+    await render(<Settings />);
+    // defaults to Automatic (time-based)
+    expect(state().settings.themeMode).toBe('auto');
+    await fireEvent.press(screen.getByText('Theme'));
+    await fireEvent.press(screen.getByText('Dark'));
+    expect(state().settings.themeMode).toBe('dark');
+    await fireEvent.press(screen.getByText('Theme'));
+    await fireEvent.press(screen.getByText('Match iOS'));
+    expect(state().settings.themeMode).toBe('system');
+  });
+
   it('erases data after confirming, keeping the profile', async () => {
     seedStore({ profile: makeProfile(), holdings: [makeHolding({ value: 5 })] });
     await render(<Settings />);

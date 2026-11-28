@@ -42,6 +42,8 @@ describe('load and migration', () => {
     expect(d.holdings[0].history).toEqual([]);
     expect(d.settings.baseCurrency).toBe('INR');
     expect(d.settings.autoLockSeconds).toBe(30);
+    // appearance preference added later; older saves default to automatic (time-based)
+    expect(d.settings.themeMode).toBe('auto');
     expect(d.fx.rates.INR).toBe(90);
     expect(d.fx.rates.EUR).toBeGreaterThan(0);
     expect(d.version).toBe(1);

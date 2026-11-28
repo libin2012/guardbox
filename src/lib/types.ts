@@ -72,8 +72,16 @@ export interface FxRates {
 
 export type SyncProviderId = 'none' | 'icloud' | 'gdrive' | 'firebase' | 'supabase' | 'aws';
 
+/**
+ * Appearance preference. 'system' follows the iOS setting; 'light'/'dark' force
+ * one; 'auto' switches by time of day (dark overnight — see NIGHT_START/END).
+ */
+export type ThemeMode = 'system' | 'light' | 'dark' | 'auto';
+
 export interface Settings {
   baseCurrency: string;
+  /** which colour scheme the app uses; defaults to 'auto' (time-based) */
+  themeMode: ThemeMode;
   lockEnabled: boolean;
   biometricsEnabled: boolean;
   autoLockSeconds: number;

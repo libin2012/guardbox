@@ -50,12 +50,12 @@ export default function Overview() {
         </View>
         <T size={36} weight="800" style={{ color: t.heroText }}>{formatMoney(shown, base, { hidden })}</T>
         {delta && !scrub ? (
-          <T size={14} weight="600" style={{ color: up ? '#4ADE9B' : '#FF8A8D' }}>
+          <T size={14} weight="600" style={{ color: up ? t.heroPositive : t.heroNegative }}>
             {hidden ? '••••' : `${up ? '▲' : '▼'} ${formatMoney(Math.abs(delta.abs), base)} (${formatPercent(delta.pct)})`}  ·  {RANGES.find((r) => r.value === range)?.label}
           </T>
         ) : null}
         <View style={{ marginHorizontal: -space(2), marginTop: space(2) }}>
-          <LineChart data={series} height={150} color="#4ADE9B" onScrub={setScrub} />
+          <LineChart data={series} height={150} color={t.heroPositive} onScrub={setScrub} />
         </View>
         <View style={{ flexDirection: 'row', gap: space(1), marginTop: space(1) }}>
           {RANGES.map((r) => (

@@ -2,12 +2,12 @@ import 'react-native-url-polyfill/auto';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LockScreen, PrivacyCover } from '../components/LockScreen';
 import { Onboarding } from '../components/Onboarding';
 import { StorageError } from '../components/StorageError';
-import { useTheme } from '../components/theme';
+import { useScheme, useTheme } from '../components/theme';
 import { refreshIfStale } from '../lib/refresh';
 import { isCompleteProfile } from '../lib/profile';
 import { hasPasscode, useLock } from '../lib/security';
@@ -15,7 +15,7 @@ import { onDataChanged, useStore } from '../lib/store';
 import { syncNow } from '../lib/sync';
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
+  const scheme = useScheme();
   const t = useTheme();
   const ready = useStore((s) => s.ready);
   const load = useStore((s) => s.load);
@@ -86,7 +86,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={{ ...navTheme, colors: { ...navTheme.colors, background: t.bg, card: t.card, primary: t.brand, text: t.text, border: t.border } }}>
-        <StatusBar style="auto" />
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         {!ready ? (
           <View style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={t.brand} />
