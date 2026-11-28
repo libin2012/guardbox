@@ -17,4 +17,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      # Runs every test and fails if coverage drops below the thresholds in jest.config.js.
+      - run: npm run test:coverage -- --ci
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/lcov-report
+          if-no-files-found: ignore
