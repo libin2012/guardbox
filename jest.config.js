@@ -5,6 +5,10 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testMatch: ['<rootDir>/src/**/__tests__/**/*.test.{ts,tsx}'],
   clearMocks: true,
+  // The first render in each screen test file pays a one-off cold start (loading
+  // React Native's renderer and host components): about 3.5 s locally and over 5 s
+  // on GitHub's 2-core runners. Later tests take milliseconds.
+  testTimeout: 15000,
   collectCoverageFrom: [
     'src/lib/**/*.{ts,tsx}',
     'src/components/**/*.{ts,tsx}',

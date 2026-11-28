@@ -127,6 +127,8 @@ describe('Settings', () => {
 });
 
 describe('Passcode screen', () => {
+  /** After a wrong code the screen clears the dots 350 ms later; let that finish inside act(). */
+  const waitForCodeReset = () => act(() => new Promise((r) => setTimeout(r, 400)));
   const type = async (code: string) => {
     for (const d of code) await fireEvent.press(screen.getByText(d));
   };
@@ -154,6 +156,7 @@ describe('Passcode screen', () => {
     expect(await screen.findByText("Passcodes didn't match. Try again.")).toBeOnTheScreen();
     expect(screen.getByText('Choose a passcode')).toBeOnTheScreen();
     expect(await hasPasscode()).toBe(false);
+    await waitForCodeReset();
   });
 
   it('needs the current passcode before changing it', async () => {
@@ -165,8 +168,7 @@ describe('Passcode screen', () => {
     await act(async () => undefined);
     await type('9999');
     expect(await screen.findByText('Wrong passcode')).toBeOnTheScreen();
-    await waitFor(() => expect(screen.getByText('Enter current passcode')).toBeOnTheScreen());
-    await new Promise((r) => setTimeout(r, 400));
+    await waitForCodeReset();
     await type('1234');
     expect(await screen.findByText('Choose a passcode')).toBeOnTheScreen();
   });
