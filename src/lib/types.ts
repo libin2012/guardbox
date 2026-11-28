@@ -70,7 +70,7 @@ export interface FxRates {
   updatedAt?: string;
 }
 
-export type SyncProviderId = 'none' | 'icloud' | 'firebase' | 'supabase' | 'aws';
+export type SyncProviderId = 'none' | 'icloud' | 'gdrive' | 'firebase' | 'supabase' | 'aws';
 
 export interface Settings {
   baseCurrency: string;
@@ -84,6 +84,8 @@ export interface Settings {
   autoSync: boolean;
   lastSyncAt?: string;
   lastSyncError?: string;
+  /** when an encrypted backup was last saved to Google Drive from this phone */
+  lastDriveBackupAt?: string;
 }
 
 /** The person using the app. Kept on the device (and in backups); there is no account. */

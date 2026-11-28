@@ -4,7 +4,7 @@ Guidance for Claude (and any other coding agent) working in this repository. Rea
 
 ## What this is
 
-GuardBox is a private, offline-first personal net-worth tracker for **iPhone** (iOS only for now; the code stays cross-platform so Android can come later). Users add assets and liabilities in any currency, see net worth over time, and lock the app with a passcode and Face ID. There is no account or server: data lives on the device, with optional backup to a file, iCloud, Firebase, Supabase or AWS (each the user's own project).
+GuardBox is a private, offline-first personal net-worth tracker for **iPhone** (iOS only for now; the code stays cross-platform so Android can come later). Users add assets and liabilities in any currency, see net worth over time, and lock the app with a passcode and Face ID. There is no account or server: data lives on the device, with optional backup to a file, Google Drive, iCloud, Firebase, Supabase or AWS (each the user's own project).
 
 Stack: Expo SDK 58, React Native 0.88, React 19.3, TypeScript (strict), expo-router, zustand, AsyncStorage, expo-secure-store, Jest + jest-expo + React Native Testing Library 14.
 
@@ -47,7 +47,9 @@ src/lib/              All business logic, no UI
   security.ts         Passcode (salted, hashed, keychain), Face ID / Touch ID, sync secrets, lock state
   profile.ts          Profile validation and normalisation (name + email required, mobile optional)
   defaults.ts         Built-in categories, default settings, fallback FX rates, currency list
-  sync/               SyncProvider implementations (icloud, firebase, supabase, aws + sigv4) and syncNow(); uploads are end-to-end encrypted with the sync passphrase
+  google.ts           Google sign-in (OAuth + PKCE, drive.file scope) and Drive REST helpers; driveBackup.ts: encrypted backups to Drive
+  format.ts           relativeTime, formatBytes
+  sync/               SyncProvider implementations (icloud, gdrive, firebase, supabase, aws + sigv4) and syncNow(); uploads are end-to-end encrypted with the sync passphrase
 src/test/             Test-only helpers (never imported by app code)
 src/__tests__/screens Screen and launch-flow tests (kept out of src/app so they never become routes)
 ```
@@ -67,7 +69,7 @@ Key rules of the data model:
 
 - TypeScript strict; no `any` unless a third-party shape forces it.
 - Keep logic in `src/lib` as plain functions so it is testable without rendering; screens stay thin.
-- Use `useTheme()` and `space()` from `components/theme.ts` for colours and spacing; reuse the components in `components/ui.tsx`.
+- Use `useTheme()` and `space()` from `components/theme.ts` for colours and spacing; reuse the components in `components/ui.tsx`. Settings-style screens use the iOS grouped list kit there (`ListSection`, `ListRow`, `ListSwitch`, `ListInput`, `IconTile`) with title-case action labels.
 - Routes only in `src/app/`; never hand-edit `ios/` or `android/` (they are generated). Native config goes in `app.config.ts`.
 - Network calls go through the helpers in `prices.ts` / `sync/types.ts`, with timeouts and readable error messages.
 - Lint must stay at zero problems; fix the code rather than disabling rules.
@@ -88,6 +90,7 @@ How to write them:
 
 - Tests run on the iOS platform preset (`jest-expo/ios`). Native modules (AsyncStorage, SecureStore, LocalAuthentication, Crypto, Haptics, vector icons, safe area) are mocked once in `jest.setup.ts`. Override per test with `mockResolvedValueOnce` on the mocked module, e.g. `LocalAuthentication.authenticateAsync`.
 - **No real network.** `fetch` throws by default in every test. Use `mockFetch()` with `json()` / `text()` from `src/test/helpers.ts`.
+- Google: `src/test/fakeDrive.ts` has an in-memory token endpoint + Drive (`fakeGoogle()`) and an `expo-auth-session` mock (`authSessionMock`, `mockAuthResult`). Mock `expo-constants` with an `extra.googleIosClientId`.
 - Build data with `makeHolding`, `makeProfile`, `makeData` and the fixed `FX` rates from `src/test/factories.ts`.
 - Reset state in `beforeEach` with `resetAppState()` (also clears the keychain mock and the cached data key), then `seedStore({...})`. Use `flushSave()` (fake timers), then `savedData()` (decrypted) or `storedText()` (the raw ciphertext) to check what was persisted. Writing plain JSON to `STORAGE_KEY` simulates data saved by an older version, which `load()` migrates.
 - Screens: mock expo-router with `jest.mock('expo-router', () => jest.requireActual('../../test/expoRouterMock'))`, import the screen from `../../app/...`, set params with `setParams`, and assert on `router.push` / `router.back`. Header buttons are rendered inline so they can be pressed.

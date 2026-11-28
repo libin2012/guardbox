@@ -151,3 +151,122 @@ export function Empty({ icon, title, body, action }: { icon: IconName; title: st
     </Card>
   );
 }
+
+// ---------- iOS grouped lists (Settings-app style) ----------
+
+/** Width of a list icon tile plus the gap after it: separators start where the text starts, as on iOS. */
+const LIST_ICON = 30;
+const LIST_PAD = space(4);
+
+/**
+ * An inset grouped section: small caps header, rounded group, footnote below.
+ * Children are separated by hairlines inset to the text, like iOS Settings.
+ */
+export function ListSection({ header, footer, children, inset = true }: { header?: string; footer?: React.ReactNode; children: React.ReactNode; inset?: boolean }) {
+  const t = useTheme();
+  const rows = React.Children.toArray(children).filter(Boolean);
+  return (
+    <View style={{ gap: space(1.5) }}>
+      {header ? (
+        <T size={13} muted style={{ textTransform: 'uppercase', letterSpacing: 0.3, paddingHorizontal: LIST_PAD }}>
+          {header}
+        </T>
+      ) : null}
+      <View style={{ backgroundColor: t.card, borderRadius: radius.sm, overflow: 'hidden' }}>
+        {rows.map((row, i) => (
+          <View key={i}>
+            {i > 0 ? <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.border, marginLeft: inset ? LIST_PAD + LIST_ICON + space(3) : LIST_PAD }} /> : null}
+            {row}
+          </View>
+        ))}
+      </View>
+      {footer ? (
+        typeof footer === 'string' ? (
+          <T size={13} muted style={{ paddingHorizontal: LIST_PAD, lineHeight: 18 }}>
+            {footer}
+          </T>
+        ) : (
+          <View style={{ paddingHorizontal: LIST_PAD }}>{footer}</View>
+        )
+      ) : null}
+    </View>
+  );
+}
+
+/** A coloured rounded-square icon tile, as in iOS Settings. */
+export function IconTile({ name, color, size = LIST_ICON }: { name: IconName; color: string; size?: number }) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: size * 0.23, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={name} size={size * 0.58} color="#fff" />
+    </View>
+  );
+}
+
+export function ListRow({
+  icon,
+  iconColor,
+  title,
+  subtitle,
+  detail,
+  accessory,
+  onPress,
+  tint,
+  destructive,
+  loading,
+  disabled,
+  right,
+}: {
+  icon?: IconName;
+  iconColor?: string;
+  title: string;
+  subtitle?: string;
+  /** grey value on the right, before the accessory */
+  detail?: string;
+  accessory?: 'chevron' | 'check' | 'none';
+  onPress?: () => void;
+  /** an action row: the title takes the tint colour */
+  tint?: boolean;
+  destructive?: boolean;
+  loading?: boolean;
+  disabled?: boolean;
+  right?: React.ReactNode;
+}) {
+  const t = useTheme();
+  const titleColor = destructive ? t.negative : tint ? t.brand : t.text;
+  const body = (pressed: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3), minHeight: 44, paddingVertical: space(2.5), paddingHorizontal: LIST_PAD, backgroundColor: pressed ? t.cardAlt : 'transparent', opacity: disabled ? 0.45 : 1 }}>
+      {icon ? <IconTile name={icon} color={iconColor ?? t.brand} /> : null}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text numberOfLines={1} style={{ color: titleColor, fontSize: 16 }}>{title}</Text>
+        {subtitle ? <T size={13} muted numberOfLines={2}>{subtitle}</T> : null}
+      </View>
+      {detail ? <T muted size={16} numberOfLines={1} style={{ maxWidth: '45%' }}>{detail}</T> : null}
+      {right}
+      {loading ? <ActivityIndicator color={t.textMuted} /> : null}
+      {!loading && accessory === 'check' ? <Ionicons name="checkmark" size={20} color={t.brand} accessibilityLabel="Selected" /> : null}
+      {!loading && accessory === 'chevron' ? <Ionicons name="chevron-forward" size={17} color={t.textMuted} /> : null}
+    </View>
+  );
+  if (!onPress) return body(false);
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: !!(disabled || loading), selected: accessory === 'check' }} onPress={onPress} disabled={disabled || loading}>
+      {({ pressed }) => body(pressed)}
+    </Pressable>
+  );
+}
+
+export function ListSwitch({ title, subtitle, value, onChange, icon, iconColor }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; icon?: IconName; iconColor?: string }) {
+  const t = useTheme();
+  return <ListRow icon={icon} iconColor={iconColor} title={title} subtitle={subtitle} right={<Switch accessibilityLabel={title} value={value} onValueChange={onChange} trackColor={{ true: t.brand, false: t.border }} />} />;
+}
+
+/** A form row inside a ListSection: a small label above a full-width input, so long labels and placeholders never wrap. */
+export function ListInput({ label, style, ...input }: TextInputProps & { label: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ paddingHorizontal: LIST_PAD, paddingTop: space(2.5), paddingBottom: space(1) }}>
+      <T size={13} muted numberOfLines={1}>{label}</T>
+      <TextInput accessibilityLabel={label} placeholderTextColor={t.textMuted} style={[{ color: t.text, fontSize: 17, paddingVertical: space(2) }, style]} {...input} />
+    </View>
+  );
+}

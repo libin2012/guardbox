@@ -45,6 +45,15 @@ describe('load and migration', () => {
     expect(d.fx.rates.INR).toBe(90);
     expect(d.fx.rates.EUR).toBeGreaterThan(0);
     expect(d.version).toBe(1);
+    // added for Google Drive backups; older saves simply have no Drive backup yet
+    expect(d.settings.lastDriveBackupAt).toBeUndefined();
+    expect(d.settings.syncProvider).toBe('none');
+  });
+
+  it('keeps Google Drive as the sync provider and the last Drive backup time', async () => {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...emptyData(), settings: { ...emptyData().settings, syncProvider: 'gdrive', lastDriveBackupAt: '2026-11-28T10:00:00.000Z' } }));
+    await store().load();
+    expect(store().data.settings).toMatchObject({ syncProvider: 'gdrive', lastDriveBackupAt: '2026-11-28T10:00:00.000Z' });
   });
 
   it('adds new built-in categories without losing custom ones', async () => {
@@ -227,7 +236,7 @@ describe('erase all data', () => {
     seedStore({
       profile: makeProfile(),
       holdings: [makeHolding({ value: 9 })],
-      settings: { ...emptyData().settings, baseCurrency: 'INR', syncProvider: 'firebase', lastSyncAt: '2026-01-01', lockEnabled: true },
+      settings: { ...emptyData().settings, baseCurrency: 'INR', syncProvider: 'firebase', lastSyncAt: '2026-01-01', lastDriveBackupAt: '2026-01-01', lockEnabled: true },
     });
     store().addCategory({ name: 'Art', kind: 'asset', type: 'other_asset', color: '#000', icon: 'brush' });
     store().resetAll();
@@ -235,6 +244,6 @@ describe('erase all data', () => {
     expect(d.holdings).toEqual([]);
     expect(d.categories).toEqual(DEFAULT_CATEGORIES);
     expect(d.profile).toEqual(makeProfile());
-    expect(d.settings).toMatchObject({ baseCurrency: 'INR', lockEnabled: true, syncProvider: 'none', lastSyncAt: undefined });
+    expect(d.settings).toMatchObject({ baseCurrency: 'INR', lockEnabled: true, syncProvider: 'none', lastSyncAt: undefined, lastDriveBackupAt: undefined });
   });
 });

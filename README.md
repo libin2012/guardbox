@@ -27,6 +27,7 @@ Built with **React Native + Expo (SDK 58) + TypeScript**, so the same code runs 
 - **Security**: all data on the device is encrypted with AES-256-GCM using a per-install key in the iOS Keychain, and tampering is detected (see [SECURITY.md](SECURITY.md)). 4 or 6-digit passcode (salted, hashed, stored in the iOS Keychain), Face ID / Touch ID unlock, auto-lock timer, privacy cover in the app switcher, and a "hide amounts" mode.
 - **Backup & sync** (all optional, data is local by default):
   - Export / import a backup file (save it to iCloud Drive, Google Drive or Files), optionally encrypted with a passphrase.
+  - **Google Drive**: back up an encrypted copy to a GuardBox folder in your Drive, restore any of them, or sync through Drive. Sign in with Google; GuardBox can only see the files it created. Needs a Google iOS OAuth client ID at build time (see [SYNC_SETUP.md](SYNC_SETUP.md#google-drive)).
   - **iCloud** sync (private iCloud Drive container).
   - **Firebase**, **Supabase** or **AWS** (Cognito + S3), each using your own project. See [SYNC_SETUP.md](SYNC_SETUP.md).
   - Cloud sync is end-to-end encrypted with your own passphrase: the provider only stores ciphertext.
@@ -81,7 +82,7 @@ Project layout:
 src/app/            screens (expo-router): tabs, item detail/edit, categories, sync, passcode
 src/components/     UI kit, charts (SVG), lock screen, pickers
 src/lib/            data model, store (zustand + AsyncStorage), calculations, prices, security
-src/lib/sync/       iCloud, Firebase, Supabase, AWS providers + sync engine
+src/lib/sync/       iCloud, Google Drive, Firebase, Supabase, AWS providers + sync engine
 src/test/           shared test helpers (factories, store helpers, expo-router mock)
 ```
 
