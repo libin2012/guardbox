@@ -1,8 +1,10 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Alert, Pressable, View } from 'react-native';
 import { Option, OptionSheet } from '../../components/OptionSheet';
+import { Avatar } from '../../components/ProfileForm';
 import { space, useTheme } from '../../components/theme';
 import { Button, Card, Divider, Field, Row, Screen, SectionTitle, T, ToggleRow } from '../../components/ui';
 import { CURRENCIES } from '../../lib/defaults';
@@ -36,6 +38,7 @@ export default function Settings() {
   const data = useStore((s) => s.data);
   const { updateSettings, resetAll } = useStore.getState();
   const s = data.settings;
+  const profile = data.profile;
   const [picker, setPicker] = useState<'currency' | 'autolock' | 'pfFreq' | 'pfDay' | 'pfHour' | null>(null);
   const [bio, setBio] = useState<string | null>(null);
   const [finnhub, setFinnhub] = useState(s.finnhubKey ?? '');
@@ -78,6 +81,19 @@ export default function Settings() {
 
   return (
     <Screen>
+      <SectionTitle>Profile</SectionTitle>
+      <Card style={{ paddingVertical: space(3) }}>
+        <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space(3), opacity: pressed ? 0.6 : 1 })} accessibilityRole="button" accessibilityLabel="Edit profile">
+          <Avatar name={profile?.fullName} size={52} />
+          <View style={{ flex: 1 }}>
+            <T weight="700" size={17} numberOfLines={1}>{profile?.fullName ?? 'Your profile'}</T>
+            <T size={13} muted numberOfLines={1}>{profile?.email ?? 'Add your name and email'}</T>
+            {profile?.mobile ? <T size={13} muted numberOfLines={1}>{profile.mobile}</T> : null}
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+        </Pressable>
+      </Card>
+
       <SectionTitle>General</SectionTitle>
       <Card style={{ paddingVertical: space(1) }}>
         <Row icon="globe-outline" title="Main currency" subtitle="Totals and charts are shown in this currency" right={<T weight="700">{s.baseCurrency}</T>} chevron onPress={() => setPicker('currency')} />

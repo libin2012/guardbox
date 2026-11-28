@@ -117,8 +117,19 @@ export interface Settings {
   epfReminderAsked?: boolean;
 }
 
+/** The person using the app. Kept on the device (and in backups); there is no account. */
+export interface Profile {
+  fullName: string;
+  email: string;
+  /** optional, as typed (spaces and a leading + are kept) */
+  mobile?: string;
+  updatedAt: string;
+}
+
 export interface AppData {
   version: 1;
+  /** set by the first-launch onboarding; required before the app opens */
+  profile?: Profile;
   holdings: Holding[];
   categories: Category[];
   snapshots: Snapshot[];
