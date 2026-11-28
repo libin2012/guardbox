@@ -8,7 +8,6 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-property', name: 'Property', kind: 'asset', type: 'property', color: '#14B8A6', icon: 'home-outline', builtIn: true },
   { id: 'cat-gold', name: 'Gold', kind: 'asset', type: 'gold', color: '#D4AF37', icon: 'diamond-outline', builtIn: true },
   { id: 'cat-vehicle', name: 'Vehicles', kind: 'asset', type: 'vehicle', color: '#64748B', icon: 'car-outline', builtIn: true },
-  { id: 'cat-pf', name: 'Provident fund (EPF)', kind: 'asset', type: 'other_asset', color: '#0EA5E9', icon: 'shield-checkmark-outline', builtIn: true },
   { id: 'cat-other-asset', name: 'Other assets', kind: 'asset', type: 'other_asset', color: '#A3A3A3', icon: 'cube-outline', builtIn: true },
   { id: 'cat-loan', name: 'Loans', kind: 'liability', type: 'loan', color: '#EF4444', icon: 'document-text-outline', builtIn: true },
   { id: 'cat-mortgage', name: 'Mortgage', kind: 'liability', type: 'mortgage', color: '#F97316', icon: 'key-outline', builtIn: true },
@@ -24,7 +23,6 @@ export const DEFAULT_SETTINGS: Settings = {
   hideAmounts: false,
   syncProvider: 'none',
   autoSync: false,
-  epfReminder: { enabled: false, frequency: 'monthly', day: 20, hour: 10 },
 };
 
 /** Offline fallback rates (approximate) so conversion works before the first refresh. */

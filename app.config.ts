@@ -15,9 +15,6 @@ const plugins: ExpoConfig['plugins'] = [
   'expo-secure-store',
   'expo-sharing',
   'expo-font',
-  // Local reminders only: no push, so no APNs entitlement (keeps free
-  // Personal Team signing working).
-  ['expo-notifications', { enableRemoteNotifications: false }],
   [
     'expo-local-authentication',
     { faceIDPermission: 'GuardBox uses Face ID to keep your finances private.' },
@@ -52,12 +49,6 @@ const config: ExpoConfig = {
     infoPlist: {
       NSFaceIDUsageDescription: 'GuardBox uses Face ID to keep your finances private.',
       ITSAppUsesNonExemptEncryption: false,
-      // Lets GuardBox appear under "Open in…" / the share sheet for PDFs
-      // (EPF passbook import). iOS copies the file into the app's Inbox.
-      CFBundleDocumentTypes: [
-        { CFBundleTypeName: 'PDF document', CFBundleTypeRole: 'Viewer', LSHandlerRank: 'Alternate', LSItemContentTypes: ['com.adobe.pdf'] },
-      ],
-      LSSupportsOpeningDocumentsInPlace: false,
     },
   },
   android: {

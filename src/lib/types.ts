@@ -34,21 +34,6 @@ export interface ValuePoint {
   value: number;
 }
 
-/** Details read from an EPF (Indian Provident Fund) passbook. */
-export interface EpfDetails {
-  uan?: string;
-  memberId?: string;
-  establishment?: string;
-  employeeShare: number;
-  employerShare: number;
-  pensionShare: number;
-  /** count the EPS (pension) column in the asset value */
-  includePension: boolean;
-  /** yyyy-mm-dd the passbook balance is valid for */
-  asOf?: string;
-  importedAt: string;
-}
-
 export interface Holding {
   id: string;
   name: string;
@@ -67,8 +52,6 @@ export interface Holding {
   priceUpdatedAt?: string;
   autoPrice?: boolean;
   notes?: string;
-  /** set on Provident Fund holdings created or updated from a passbook */
-  epf?: EpfDetails;
   createdAt: string;
   updatedAt: string;
   history: ValuePoint[];
@@ -89,17 +72,6 @@ export interface FxRates {
 
 export type SyncProviderId = 'none' | 'icloud' | 'firebase' | 'supabase' | 'aws';
 
-export type ReminderFrequency = 'monthly' | 'quarterly';
-
-export interface EpfReminderSettings {
-  enabled: boolean;
-  frequency: ReminderFrequency;
-  /** day of month, 1-28 */
-  day: number;
-  /** hour of day, 0-23 */
-  hour: number;
-}
-
 export interface Settings {
   baseCurrency: string;
   lockEnabled: boolean;
@@ -112,9 +84,6 @@ export interface Settings {
   autoSync: boolean;
   lastSyncAt?: string;
   lastSyncError?: string;
-  epfReminder: EpfReminderSettings;
-  /** true once the user has been asked about the PF reminder */
-  epfReminderAsked?: boolean;
 }
 
 export interface AppData {

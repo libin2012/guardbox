@@ -1,8 +1,0 @@
-{
-  "name": "epf-pdf",
-  "version": "1.0.0",
-  "description": "On-device PDF text extraction (with password unlock) for EPF passbook import",
-  "main": "index.ts",
-  "private": true,
-  "license": "UNLICENSED"
-}

@@ -10,18 +10,6 @@ import { refreshAll } from '../../lib/refresh';
 import { authenticateBiometric, biometricLabel, clearPasscode, hasPasscode } from '../../lib/security';
 import { useStore } from '../../lib/store';
 import { getProvider } from '../../lib/sync';
-import { describeReminder, ensureNotificationPermission, scheduleEpfReminder } from '../../lib/epf/reminder';
-import { EpfReminderSettings, ReminderFrequency } from '../../lib/types';
-
-const PF_FREQUENCY: Option[] = [
-  { value: 'monthly', label: 'Every month' },
-  { value: 'quarterly', label: 'Every 3 months' },
-];
-const PF_DAYS: Option[] = Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Day ${i + 1}` }));
-const PF_HOURS: Option[] = Array.from({ length: 15 }, (_, i) => {
-  const h = i + 7;
-  return { value: String(h), label: new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
-});
 
 const AUTO_LOCK: Option[] = [
   { value: '0', label: 'Immediately' },
@@ -36,7 +24,7 @@ export default function Settings() {
   const data = useStore((s) => s.data);
   const { updateSettings, resetAll } = useStore.getState();
   const s = data.settings;
-  const [picker, setPicker] = useState<'currency' | 'autolock' | 'pfFreq' | 'pfDay' | 'pfHour' | null>(null);
+  const [picker, setPicker] = useState<'currency' | 'autolock' | null>(null);
   const [bio, setBio] = useState<string | null>(null);
   const [finnhub, setFinnhub] = useState(s.finnhubKey ?? '');
   const [coingecko, setCoingecko] = useState(s.coingeckoKey ?? '');
@@ -64,17 +52,6 @@ export default function Settings() {
   };
 
   const provider = getProvider(s.syncProvider);
-
-  const setReminder = async (patch: Partial<EpfReminderSettings>) => {
-    const next = { ...s.epfReminder, ...patch };
-    if (patch.enabled && !(await ensureNotificationPermission())) {
-      Alert.alert('Notifications are off', 'Allow notifications for GuardBox in the iOS Settings app to get PF reminders.');
-      return;
-    }
-    updateSettings({ epfReminder: next, epfReminderAsked: true });
-    scheduleEpfReminder(next).catch((e) => Alert.alert('Could not set the reminder', String(e?.message ?? e)));
-  };
-  const pf = s.epfReminder;
 
   return (
     <Screen>
@@ -104,23 +81,6 @@ export default function Settings() {
         <Row icon="pricetags-outline" title="Categories" subtitle="Add or rename asset and liability types" chevron onPress={() => router.push('/categories')} />
         <Divider />
         <Row icon="cloud-upload-outline" title="Backup & sync" subtitle={provider ? `${provider.label}${s.lastSyncAt ? ` · last ${new Date(s.lastSyncAt).toLocaleString()}` : ''}` : 'Stored on this device only'} chevron onPress={() => router.push('/sync')} />
-      </Card>
-
-      <SectionTitle>Provident fund (EPF)</SectionTitle>
-      <Card style={{ paddingVertical: space(1) }}>
-        <Row icon="document-text-outline" title="Import EPF passbook" subtitle="Read the PDF from UMANG or the EPFO portal, on this device" chevron onPress={() => router.push('/epf-import')} />
-        <Divider />
-        <ToggleRow icon="notifications-outline" title="Update reminder" subtitle={describeReminder(pf)} value={pf.enabled} onChange={(v) => setReminder({ enabled: v })} />
-        {pf.enabled ? (
-          <>
-            <Divider />
-            <Row title="Repeat" right={<T muted>{PF_FREQUENCY.find((o) => o.value === pf.frequency)?.label}</T>} chevron onPress={() => setPicker('pfFreq')} />
-            <Divider />
-            <Row title="Day of month" right={<T muted>{pf.day}</T>} chevron onPress={() => setPicker('pfDay')} />
-            <Divider />
-            <Row title="Time" right={<T muted>{PF_HOURS.find((o) => o.value === String(pf.hour))?.label ?? `${pf.hour}:00`}</T>} chevron onPress={() => setPicker('pfHour')} />
-          </>
-        ) : null}
       </Card>
 
       <SectionTitle>Live prices</SectionTitle>
@@ -161,9 +121,6 @@ export default function Settings() {
       <T size={12} muted style={{ textAlign: 'center' }}>GuardBox {Constants.expoConfig?.version ?? ''} · Your data stays on your device unless you turn on sync.</T>
 
       <OptionSheet visible={picker === 'currency'} title="Main currency" options={currencyOptions} value={s.baseCurrency} onSelect={(c) => updateSettings({ baseCurrency: c })} onClose={() => setPicker(null)} searchable />
-      <OptionSheet visible={picker === 'pfFreq'} title="Repeat" options={PF_FREQUENCY} value={pf.frequency} onSelect={(v) => setReminder({ frequency: v as ReminderFrequency })} onClose={() => setPicker(null)} />
-      <OptionSheet visible={picker === 'pfDay'} title="Day of month" options={PF_DAYS} value={String(pf.day)} onSelect={(v) => setReminder({ day: Number(v) })} onClose={() => setPicker(null)} />
-      <OptionSheet visible={picker === 'pfHour'} title="Time" options={PF_HOURS} value={String(pf.hour)} onSelect={(v) => setReminder({ hour: Number(v) })} onClose={() => setPicker(null)} />
       <OptionSheet visible={picker === 'autolock'} title="Auto-lock" options={AUTO_LOCK} value={String(s.autoLockSeconds)} onSelect={(v) => updateSettings({ autoLockSeconds: Number(v) })} onClose={() => setPicker(null)} />
     </Screen>
   );

@@ -1,14 +1,11 @@
 import 'react-native-url-polyfill/auto';
-import * as Notifications from 'expo-notifications';
-import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useRootNavigationState } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, AppStateStatus, Platform, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, AppState, AppStateStatus, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LockScreen, PrivacyCover } from '../components/LockScreen';
 import { useTheme } from '../components/theme';
-import { usePendingImport } from '../lib/epf/pending';
-import { isEpfReminderResponse, scheduleEpfReminder } from '../lib/epf/reminder';
 import { refreshIfStale } from '../lib/refresh';
 import { hasPasscode, useLock } from '../lib/security';
 import { onDataChanged, useStore } from '../lib/store';
@@ -30,42 +27,8 @@ export default function RootLayout() {
       // never lock someone out if the passcode was removed from the keychain
       if (!s.lockEnabled || !(await hasPasscode())) unlock();
       refreshIfStale();
-      // keep the PF reminder in step with settings (e.g. after a restore)
-      scheduleEpfReminder(s.epfReminder).catch(() => undefined);
     });
   }, [load, unlock]);
-
-  // a tap on the PF reminder opens the import screen (held until unlocked)
-  useEffect(() => {
-    const handle = (res: Notifications.NotificationResponse | null) => {
-      if (!isEpfReminderResponse(res)) return;
-      usePendingImport.getState().request();
-      Notifications.clearLastNotificationResponse();
-    };
-    if (Platform.OS === 'web') return;
-    try {
-      handle(Notifications.getLastNotificationResponse());
-    } catch {
-      // not available in this runtime
-    }
-    const sub = Notifications.addNotificationResponseReceivedListener(handle);
-    return () => sub.remove();
-  }, []);
-
-  // open the import screen for a shared PDF or reminder once the app is ready and unlocked
-  const navReady = !!useRootNavigationState()?.key;
-  const pending = usePendingImport((s) => s.pending);
-  const unlocked = ready && !(lockEnabled && locked);
-  useEffect(() => {
-    if (!unlocked || !navReady || !pending) return;
-    // let the stack finish mounting (it is replaced by the lock screen while locked)
-    const timer = setTimeout(() => {
-      const p = usePendingImport.getState().take();
-      if (!p) return;
-      router.push(p.file ? { pathname: '/epf-import', params: { file: p.file } } : '/epf-import');
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [unlocked, navReady, pending]);
 
   // lock after the app has been in the background longer than the auto-lock delay
   useEffect(() => {
@@ -121,7 +84,6 @@ export default function RootLayout() {
               <Stack.Screen name="categories" options={{ title: 'Categories' }} />
               <Stack.Screen name="sync" options={{ title: 'Backup & sync' }} />
               <Stack.Screen name="passcode" options={{ presentation: 'modal', title: 'Passcode' }} />
-              <Stack.Screen name="epf-import" options={{ title: 'EPF passbook' }} />
             </Stack>
             {covered ? <PrivacyCover /> : null}
           </>

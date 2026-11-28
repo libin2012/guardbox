@@ -68,25 +68,6 @@ export default function HoldingDetail() {
         {h.notes ? (<><Divider /><Row title="Notes" subtitle={h.notes} /></>) : null}
       </Card>
 
-      {h.epf || h.categoryId === 'cat-pf' ? (
-        <>
-          <SectionTitle>EPF passbook</SectionTitle>
-          {h.epf ? (
-            <Card style={{ paddingVertical: space(1) }}>
-              <Row title="Employee share" right={<T weight="600">{formatMoney(h.epf.employeeShare, h.currency, { hidden })}</T>} />
-              <Divider />
-              <Row title="Employer share" right={<T weight="600">{formatMoney(h.epf.employerShare, h.currency, { hidden })}</T>} />
-              <Divider />
-              <Row title="Pension (EPS)" subtitle={h.epf.includePension ? 'Counted in net worth' : 'Not counted in net worth'} right={<T weight="600">{formatMoney(h.epf.pensionShare, h.currency, { hidden })}</T>} />
-              {h.epf.asOf ? (<><Divider /><Row title="Balance as on" right={<T muted>{parseDay(h.epf.asOf).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</T>} /></>) : null}
-              {h.epf.uan ? (<><Divider /><Row title="UAN" right={<T muted>{hidden ? '••••' + h.epf.uan.slice(-4) : h.epf.uan}</T>} /></>) : null}
-              {h.epf.memberId ? (<><Divider /><Row title="Member ID" right={<T muted numberOfLines={1}>{h.epf.memberId}</T>} /></>) : null}
-            </Card>
-          ) : null}
-          <Button title="Import new passbook" icon="document-text-outline" variant="secondary" onPress={() => router.push({ pathname: '/epf-import', params: { holding: h.id } })} />
-        </>
-      ) : null}
-
       <View style={{ flexDirection: 'row', gap: space(3) }}>
         <Button title="Edit" icon="create-outline" onPress={() => router.push(`/holding/edit?id=${h.id}`)} style={{ flex: 1 }} />
         <Button title="Delete" icon="trash-outline" variant="secondary" onPress={confirmDelete} style={{ flex: 1 }} />
