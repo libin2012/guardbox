@@ -24,9 +24,9 @@ Built with **React Native + Expo (SDK 58) + TypeScript**, so the same code runs 
   | Exchange rates | open.er-api.com, fallback Frankfurter (ECB) | No |
 
   Property, vehicles, cash, bank balances and debts stay **manual**: there is no free, reliable feed for them.
-- **Security**: 4 or 6-digit passcode (salted, hashed, stored in the iOS Keychain), Face ID / Touch ID unlock, auto-lock timer, privacy cover in the app switcher, and a "hide amounts" mode.
+- **Security**: all data on the device is encrypted with AES-256-GCM using a per-install key in the iOS Keychain, and tampering is detected (see [SECURITY.md](SECURITY.md)). 4 or 6-digit passcode (salted, hashed, stored in the iOS Keychain), Face ID / Touch ID unlock, auto-lock timer, privacy cover in the app switcher, and a "hide amounts" mode.
 - **Backup & sync** (all optional, data is local by default):
-  - Export / import a backup file (save it to iCloud Drive, Google Drive or Files).
+  - Export / import a backup file (save it to iCloud Drive, Google Drive or Files), optionally encrypted with a passphrase.
   - **iCloud** sync (private iCloud Drive container).
   - **Firebase**, **Supabase** or **AWS** (Cognito + S3), each using your own project. See [SYNC_SETUP.md](SYNC_SETUP.md).
   - Two-way sync with conflict detection: if both the phone and the cloud changed, you choose which copy to keep.

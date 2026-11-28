@@ -8,6 +8,7 @@ import Settings from '../../app/(tabs)/settings';
 import Categories from '../../app/categories';
 import PasscodeScreen from '../../app/passcode';
 import SyncScreen from '../../app/sync';
+import { decryptBackup, encryptBackup } from '../../lib/backupCrypto';
 import { emptyData } from '../../lib/defaults';
 import { clearPasscode, hasPasscode, setPasscode, useLock, verifyPasscode } from '../../lib/security';
 import { toBackup, useStore } from '../../lib/store';
@@ -214,18 +215,86 @@ describe('Categories', () => {
 });
 
 describe('Backup & sync screen', () => {
-  it('exports a backup file and opens the share sheet', async () => {
+  /** The share sheet sees the file; afterwards it is deleted from the cache. */
+  const shared = () => {
+    const seen: { uri: string; text: string }[] = [];
+    (Sharing.shareAsync as jest.Mock).mockImplementationOnce(async (uri: string) => void seen.push({ uri, text: files.get(uri)! }));
+    return seen;
+  };
+  let prompt: jest.SpyInstance;
+  beforeEach(() => {
+    prompt = jest.spyOn(Alert, 'prompt').mockImplementation(() => undefined);
+  });
+  afterEach(() => prompt.mockRestore());
+  type PromptButton = { text: string; onPress?: (v?: string) => void };
+  const answerPrompt = async (button: string, value: string, call = -1) => {
+    const buttons = prompt.mock.calls.at(call)![2] as PromptButton[];
+    await act(async () => buttons.find((b) => b.text === button)!.onPress!(value));
+  };
+
+  it('exports a plain backup file when you choose no encryption, then removes the temp copy', async () => {
     seedStore({ profile: makeProfile(), holdings: [makeHolding({ name: 'Flat', value: 1 })], settings: { ...emptyData().settings, finnhubKey: 'secret' } });
+    const seen = shared();
     await render(<SyncScreen />);
     await fireEvent.press(screen.getByText('Export'));
+    expect(alert).toHaveBeenCalledWith('Protect this backup?', expect.any(String), expect.any(Array));
+    await pressAlertButton('Export without encryption');
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled());
     const [uri, opts] = (Sharing.shareAsync as jest.Mock).mock.calls[0];
     expect(uri).toMatch(/^file:\/\/\/cache\/GuardBox-backup-\d{4}-\d{2}-\d{2}\.json$/);
     expect(opts).toMatchObject({ mimeType: 'application/json', UTI: 'public.json' });
-    const written = JSON.parse(files.get(uri)!);
+    const written = JSON.parse(seen[0].text);
     expect(written.app).toBe('GuardBox');
     expect(written.data.holdings[0].name).toBe('Flat');
-    expect(files.get(uri)).not.toContain('secret');
+    expect(seen[0].text).not.toContain('secret');
+    await waitFor(() => expect(files.has(uri)).toBe(false));
+  });
+
+  it('exports an encrypted backup after the passphrase is typed twice', async () => {
+    seedStore({ profile: makeProfile(), holdings: [makeHolding({ name: 'Flat', value: 1 })] });
+    const seen = shared();
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('Export'));
+    await pressAlertButton('Encrypt with passphrase');
+    expect(prompt).toHaveBeenCalledWith('Choose a passphrase', expect.any(String), expect.any(Array), 'secure-text');
+    await answerPrompt('Next', 'long enough pass');
+    expect(prompt).toHaveBeenLastCalledWith('Type it again', undefined, expect.any(Array), 'secure-text');
+    await answerPrompt('Export', 'long enough pass');
+    await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled(), { timeout: 5000 });
+    expect(seen[0].uri).toMatch(/-encrypted\.json$/);
+    expect(seen[0].text).not.toContain('Flat');
+    const restored = await decryptBackup(seen[0].text, 'long enough pass');
+    expect(restored.data.holdings[0].name).toBe('Flat');
+  });
+
+  it('does not export when the passphrase is too short or the two do not match', async () => {
+    seedStore();
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('Export'));
+    await pressAlertButton('Encrypt with passphrase');
+    await answerPrompt('Next', 'short');
+    expect(alert).toHaveBeenLastCalledWith('Passphrase too short', 'Use at least 8 characters.');
+    await answerPrompt('Next', 'long enough pass');
+    await answerPrompt('Export', 'something else');
+    expect(alert).toHaveBeenLastCalledWith('Passphrases do not match', expect.any(String));
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
+  });
+
+  it('imports an encrypted backup with the right passphrase', async () => {
+    seedStore();
+    const backup = toBackup({ ...emptyData(), holdings: [makeHolding({ name: 'Secret villa' })] });
+    files.set('file:///enc.json', await encryptBackup(backup, 'long enough pass', { N: 2 ** 10, r: 8, p: 1 }));
+    (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///enc.json' }] });
+    await render(<SyncScreen />);
+    await fireEvent.press(screen.getByText('Import'));
+    await waitFor(() => expect(prompt).toHaveBeenCalledWith('Enter the passphrase', 'This backup is encrypted.', expect.any(Array), 'secure-text'));
+    await answerPrompt('Open', 'wrong passphrase');
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Import failed', 'Wrong passphrase, or the file was changed after it was exported.'));
+    await answerPrompt('Open', 'long enough pass');
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('Restore this backup?', expect.stringContaining('1 items'), expect.any(Array)));
+    await pressAlertButton('Restore');
+    expect(state().holdings[0].name).toBe('Secret villa');
+    (DocumentPicker.getDocumentAsync as jest.Mock).mockReset();
   });
 
   it('imports a backup after confirming', async () => {

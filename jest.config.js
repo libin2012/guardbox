@@ -2,6 +2,12 @@
 module.exports = {
   // GuardBox ships on iOS only, so tests run against the iOS platform modules.
   preset: 'jest-expo/ios',
+  // jest-expo's list, plus @noble (ships ES modules only, so Babel must transform it)
+  transformIgnorePatterns: [
+    '/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@noble))',
+    '/node_modules/react-native-reanimated/plugin/',
+    '/node_modules/@react-native/babel-preset/',
+  ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testMatch: ['<rootDir>/src/**/__tests__/**/*.test.{ts,tsx}'],
   clearMocks: true,

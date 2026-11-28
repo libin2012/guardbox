@@ -1,11 +1,12 @@
 import 'react-native-url-polyfill/auto';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LockScreen, PrivacyCover } from '../components/LockScreen';
 import { Onboarding } from '../components/Onboarding';
+import { StorageError } from '../components/StorageError';
 import { useTheme } from '../components/theme';
 import { refreshIfStale } from '../lib/refresh';
 import { isCompleteProfile } from '../lib/profile';
@@ -18,6 +19,7 @@ export default function RootLayout() {
   const t = useTheme();
   const ready = useStore((s) => s.ready);
   const load = useStore((s) => s.load);
+  const storageError = useStore((s) => s.storageError);
   const lockEnabled = useStore((s) => s.data.settings.lockEnabled);
   const { locked, lock, unlock } = useLock();
   const hasProfile = useStore((s) => isCompleteProfile(s.data.profile));
@@ -26,14 +28,20 @@ export default function RootLayout() {
   const [onboarding, setOnboarding] = useState(false);
   const backgroundedAt = useRef<number | null>(null);
 
-  useEffect(() => {
-    load().then(async () => {
-      const s = useStore.getState().data.settings;
-      // never lock someone out if the passcode was removed from the keychain
-      if (!s.lockEnabled || !(await hasPasscode())) unlock();
-      refreshIfStale();
-    });
+  /** Decrypt saved data, then decide whether the lock screen is needed. */
+  const boot = useCallback(async () => {
+    await load();
+    const { data, storageError: failed } = useStore.getState();
+    if (failed) return;
+    // the app starts locked (and stays locked while data can't be opened);
+    // never lock someone out if the passcode was removed from the keychain
+    if (!data.settings.lockEnabled || !(await hasPasscode())) unlock();
+    refreshIfStale();
   }, [load, unlock]);
+
+  useEffect(() => {
+    boot();
+  }, [boot]);
 
   const unlocked = ready && !(lockEnabled && locked);
   const needsProfile = unlocked && !hasProfile;
@@ -83,6 +91,8 @@ export default function RootLayout() {
           <View style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator color={t.brand} />
           </View>
+        ) : storageError ? (
+          <StorageError code={storageError} onRetry={boot} onErase={() => useStore.getState().eraseUnreadableData().then(boot)} />
         ) : lockEnabled && locked ? (
           <LockScreen />
         ) : (

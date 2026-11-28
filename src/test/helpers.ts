@@ -2,8 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act } from '@testing-library/react-native';
 import { emptyData } from '../lib/defaults';
 import { useLock } from '../lib/security';
-import { useStore } from '../lib/store';
+import { useStore, whenSaved } from '../lib/store';
 import { AppData } from '../lib/types';
+import { forgetCachedKey, getDataKey, openString } from '../lib/vault';
 
 export const STORAGE_KEY = 'guardbox:data:v1';
 
@@ -14,15 +15,26 @@ export function seedStore(data: Partial<AppData> = {}, ready = true) {
 
 /** Back to a fresh install: empty store, empty storage, locked. */
 export async function resetAppState() {
-  useStore.setState({ ready: false, data: emptyData() });
+  useStore.setState({ ready: false, data: emptyData(), storageError: undefined });
   useLock.setState({ locked: true });
   await AsyncStorage.clear();
+  // a fresh install has no data key either
+  forgetCachedKey();
+  (jest.requireMock('expo-secure-store') as { __items: Map<string, string> }).__items.clear();
 }
 
-/** What has been written to disk (after the 250 ms save debounce has run). */
+/** The raw string in storage (encrypted, unless written by an older version). */
+export async function storedText(): Promise<string | null> {
+  await whenSaved();
+  return AsyncStorage.getItem(STORAGE_KEY);
+}
+
+/** What has been written to disk, decrypted (after the 250 ms save debounce has run). */
 export async function savedData(): Promise<AppData | null> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY);
-  return raw ? (JSON.parse(raw) as AppData) : null;
+  const raw = await storedText();
+  if (!raw) return null;
+  const key = await getDataKey(false);
+  return JSON.parse(openString(raw, key!, 'guardbox:data:v1')) as AppData;
 }
 
 /** Run the store's debounced save. Needs fake timers. */

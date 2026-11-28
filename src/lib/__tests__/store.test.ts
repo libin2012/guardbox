@@ -204,8 +204,8 @@ describe('persistence', () => {
     store().addHolding({ name: 'B', kind: 'asset', categoryId: 'cat-cash', currency: 'USD', mode: 'manual', value: 2 });
     store().updateSettings({ baseCurrency: 'GBP' });
     flushSave();
-    expect(setItem).toHaveBeenCalledTimes(1);
     const saved = (await savedData())!;
+    expect(setItem).toHaveBeenCalledTimes(1);
     expect(saved.holdings.map((h) => h.name)).toEqual(['A', 'B']);
     expect(saved.settings.baseCurrency).toBe('GBP');
   });

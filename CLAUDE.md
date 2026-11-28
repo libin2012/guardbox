@@ -37,7 +37,9 @@ src/app/              Screens (expo-router; every file is a route)
 src/components/       UI kit (ui.tsx), theme, charts (SVG), LockScreen, PinPad, Onboarding, ProfileForm, OptionSheet
 src/lib/              All business logic, no UI
   types.ts            Data model: AppData, Holding, Category, Settings, Profile, BackupFile
-  store.ts            zustand store; persistence to AsyncStorage (debounced 250 ms); migrate(); backup to/from JSON
+  store.ts            zustand store; encrypted persistence to AsyncStorage (debounced 250 ms); migrate(); backup to/from JSON
+  vault.ts            AES-256-GCM encryption at rest; per-install data key in the keychain; VaultError codes
+  backupCrypto.ts     Passphrase-protected backup files (scrypt + AES-256-GCM)
   calc.ts             Totals, net worth, category breakdown, history points, daily snapshots, chart series
   money.ts            Currency conversion (USD-based rates), formatting, parsing typed amounts
   prices.ts           Free price feeds: CoinGecko, gold-api.com, Stooq, Finnhub, open.er-api.com, Frankfurter
@@ -56,6 +58,7 @@ Key rules of the data model:
 - Daily net-worth snapshots are stored **in USD** so changing the base currency redraws history correctly.
 - Every user edit goes through the store's `commit()`, which stamps `modifiedAt`, updates today's snapshot, saves, and notifies auto sync. Price and FX refreshes are not user edits (they do not change `modifiedAt`).
 - `migrate()` in `store.ts` must accept every older saved shape. When you add a field to `AppData`, give it a default there and add a migration test.
+- Everything saved to AsyncStorage is encrypted (`vault.ts`, see SECURITY.md). Never write app data to AsyncStorage, files or logs in plain text. If saved data cannot be opened (`storageError`), nothing is saved until the user retries or erases; keep it that way so unreadable data is never overwritten.
 - Backups (`toBackup`) contain only the base currency from settings: never API keys, lock state or sync credentials. Sync secrets live in the keychain.
 - The profile is required (onboarding runs until `isCompleteProfile` passes). Erasing data and restoring a backup keep the profile typed on this device.
 
@@ -85,7 +88,7 @@ How to write them:
 - Tests run on the iOS platform preset (`jest-expo/ios`). Native modules (AsyncStorage, SecureStore, LocalAuthentication, Crypto, Haptics, vector icons, safe area) are mocked once in `jest.setup.ts`. Override per test with `mockResolvedValueOnce` on the mocked module, e.g. `LocalAuthentication.authenticateAsync`.
 - **No real network.** `fetch` throws by default in every test. Use `mockFetch()` with `json()` / `text()` from `src/test/helpers.ts`.
 - Build data with `makeHolding`, `makeProfile`, `makeData` and the fixed `FX` rates from `src/test/factories.ts`.
-- Reset state in `beforeEach` with `resetAppState()`, then `seedStore({...})`. Use `savedData()` and `flushSave()` (fake timers) to check what was persisted.
+- Reset state in `beforeEach` with `resetAppState()` (also clears the keychain mock and the cached data key), then `seedStore({...})`. Use `flushSave()` (fake timers), then `savedData()` (decrypted) or `storedText()` (the raw ciphertext) to check what was persisted. Writing plain JSON to `STORAGE_KEY` simulates data saved by an older version, which `load()` migrates.
 - Screens: mock expo-router with `jest.mock('expo-router', () => jest.requireActual('../../test/expoRouterMock'))`, import the screen from `../../app/...`, set params with `setParams`, and assert on `router.push` / `router.back`. Header buttons are rendered inline so they can be pressed.
 - React Native Testing Library 14 is async: always `await render(...)` and `await fireEvent.press(...)`. Prefer queries by text, label or placeholder over test IDs. Its docs for the installed version are in `node_modules/@testing-library/react-native/docs/`.
 - Alerts: `jest.spyOn(Alert, 'alert')`, then call the button's `onPress` inside `act()`.
