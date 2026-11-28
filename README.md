@@ -67,9 +67,11 @@ No code changes needed: `npx expo run:android` (Android Studio) or `npx eas-cli 
 ## Development
 
 ```bash
-npm run typecheck   # TypeScript
-npm test            # unit tests (totals, currency conversion, quote parsing, AWS signing)
-npm run web         # quick UI preview in the browser
+npm run lint            # ESLint (must stay at 0 problems)
+npm run typecheck       # TypeScript
+npm test                # unit + screen tests (Jest, React Native Testing Library)
+npm run test:coverage   # same, plus a coverage report; fails below the thresholds in jest.config.js
+npm run web             # quick UI preview in the browser
 ```
 
 Project layout:
@@ -79,6 +81,9 @@ src/app/            screens (expo-router): tabs, item detail/edit, categories, s
 src/components/     UI kit, charts (SVG), lock screen, pickers
 src/lib/            data model, store (zustand + AsyncStorage), calculations, prices, security
 src/lib/sync/       iCloud, Firebase, Supabase, AWS providers + sync engine
+src/test/           shared test helpers (factories, store helpers, expo-router mock)
 ```
+
+Every feature has regression tests, and CI runs them on each pull request. New features must come with tests; see [CLAUDE.md](CLAUDE.md) for conventions.
 
 Adding a sync provider: implement `SyncProvider` (`push`, `pull`, optional `signUp`) in `src/lib/sync/` and add it to `PROVIDERS` in `src/lib/sync/index.ts`.
