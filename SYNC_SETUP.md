@@ -4,6 +4,24 @@ GuardBox keeps everything on your phone unless you turn on sync. Each provider b
 
 Sync stores one backup document per user, **end-to-end encrypted** on the phone with an encryption passphrase you choose in Backup & sync (use the same one on every device). The provider only ever stores ciphertext. When both the phone and the cloud changed since the last sync, GuardBox asks which copy to keep.
 
+## Google Drive
+
+Used for **Back Up Now / Restore from Google Drive** and for Google Drive **sync**. Free, and you only set it up once per app build.
+
+1. Go to console.cloud.google.com and create a project (or pick one).
+2. **APIs & Services > Library**: enable the **Google Drive API**.
+3. **APIs & Services > OAuth consent screen** (Google Auth Platform): app name *GuardBox*, your email as support and developer contact. Under **Data access** add the scope `.../auth/drive.file` (non-sensitive, so no Google review is needed). While the app is in *Testing*, add your Google account under **Audience > Test users**. Note: in Testing mode Google expires the sign-in after 7 days; publish the app (no review needed for this scope) to avoid that.
+4. **Clients > Create client > iOS**: bundle ID = the app's bundle ID (`com.guardbox.app` unless you set `IOS_BUNDLE_ID`). Copy the **Client ID** (`1234-abc.apps.googleusercontent.com`).
+5. Build with it:
+   ```bash
+   GOOGLE_IOS_CLIENT_ID=1234-abc.apps.googleusercontent.com npx expo prebuild --clean
+   GOOGLE_IOS_CLIENT_ID=1234-abc.apps.googleusercontent.com npx expo run:ios --device
+   ```
+   `app.config.ts` registers the reversed client ID as a URL scheme so Google can return to the app. The client ID is not a secret (iOS clients have none).
+6. In GuardBox: Settings > Backup & sync > **Connect Google Drive**.
+
+Files go into a **GuardBox** folder in your Drive: `GuardBox-backup-<date>-<time>.json` for each backup, and `GuardBox-sync.json` if you sync through Drive. All are encrypted with your passphrase. GuardBox can only see files it created, so moving them out of the folder or renaming them is fine, but deleting the folder starts a new one.
+
 ## iCloud
 
 Needs a paid Apple Developer account. Build with `ENABLE_ICLOUD=1` (see README). The container defaults to `iCloud.<bundle id>`; override with `ICLOUD_CONTAINER=iCloud.your.container`. In the Apple Developer portal, enable iCloud (CloudKit/iCloud Documents) for the App ID and create the container if Xcode does not do it automatically.

@@ -4,11 +4,12 @@ import { getSecret, setSecret } from '../security';
 import { BackupFile, SyncProviderId } from '../types';
 import { awsProvider } from './aws';
 import { firebaseProvider } from './firebase';
+import { gdriveProvider } from './gdrive';
 import { icloudProvider } from './icloud';
 import { supabaseProvider } from './supabase';
 import { ProviderConfig, SyncProvider } from './types';
 
-export const PROVIDERS: SyncProvider[] = [icloudProvider, firebaseProvider, supabaseProvider, awsProvider];
+export const PROVIDERS: SyncProvider[] = [icloudProvider, gdriveProvider, firebaseProvider, supabaseProvider, awsProvider];
 
 export function getProvider(id: SyncProviderId): SyncProvider | undefined {
   return PROVIDERS.find((p) => p.id === id);

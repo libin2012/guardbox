@@ -50,8 +50,8 @@ async function seedSynced(opts: { lastSyncAt: string; modifiedAt: string }, pass
 }
 
 describe('providers', () => {
-  it('offers iCloud, Firebase, Supabase and AWS', () => {
-    expect(PROVIDERS.map((p) => p.id)).toEqual(['icloud', 'firebase', 'supabase', 'aws']);
+  it('offers iCloud, Google Drive, Firebase, Supabase and AWS', () => {
+    expect(PROVIDERS.map((p) => p.id)).toEqual(['icloud', 'gdrive', 'firebase', 'supabase', 'aws']);
     expect(getProvider('none')).toBeUndefined();
     expect(getProvider('aws')?.label).toBe('AWS');
   });

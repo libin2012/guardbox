@@ -238,7 +238,7 @@ describe('Backup & sync screen', () => {
     seedStore({ profile: makeProfile(), holdings: [makeHolding({ name: 'Flat', value: 1 })], settings: { ...emptyData().settings, finnhubKey: 'secret' } });
     const seen = shared();
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Export'));
+    await fireEvent.press(screen.getByText('Export Backup…'));
     expect(alert).toHaveBeenCalledWith('Protect this backup?', expect.any(String), expect.any(Array));
     await pressAlertButton('Export without encryption');
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled());
@@ -256,12 +256,12 @@ describe('Backup & sync screen', () => {
     seedStore({ profile: makeProfile(), holdings: [makeHolding({ name: 'Flat', value: 1 })] });
     const seen = shared();
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Export'));
+    await fireEvent.press(screen.getByText('Export Backup…'));
     await pressAlertButton('Encrypt with passphrase');
     expect(prompt).toHaveBeenCalledWith('Choose a passphrase', expect.any(String), expect.any(Array), 'secure-text');
     await answerPrompt('Next', 'long enough pass');
     expect(prompt).toHaveBeenLastCalledWith('Type it again', undefined, expect.any(Array), 'secure-text');
-    await answerPrompt('Export', 'long enough pass');
+    await answerPrompt('Continue', 'long enough pass');
     await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalled(), { timeout: 5000 });
     expect(seen[0].uri).toMatch(/-encrypted\.json$/);
     expect(seen[0].text).not.toContain('Flat');
@@ -272,12 +272,12 @@ describe('Backup & sync screen', () => {
   it('does not export when the passphrase is too short or the two do not match', async () => {
     seedStore();
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Export'));
+    await fireEvent.press(screen.getByText('Export Backup…'));
     await pressAlertButton('Encrypt with passphrase');
     await answerPrompt('Next', 'short');
     expect(alert).toHaveBeenLastCalledWith('Passphrase too short', 'Use at least 8 characters.');
     await answerPrompt('Next', 'long enough pass');
-    await answerPrompt('Export', 'something else');
+    await answerPrompt('Continue', 'something else');
     expect(alert).toHaveBeenLastCalledWith('Passphrases do not match', expect.any(String));
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });
@@ -288,7 +288,7 @@ describe('Backup & sync screen', () => {
     files.set('file:///enc.json', await encryptBackup(backup, 'long enough pass', { N: 2 ** 10, r: 8, p: 1 }));
     (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///enc.json' }] });
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Import'));
+    await fireEvent.press(screen.getByText('Restore from File…'));
     await waitFor(() => expect(prompt).toHaveBeenCalledWith('Enter the passphrase', 'This backup is encrypted.', expect.any(Array), 'secure-text'));
     await answerPrompt('Open', 'wrong passphrase');
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Import failed', 'Wrong passphrase, or the file was changed after it was exported.'));
@@ -305,7 +305,7 @@ describe('Backup & sync screen', () => {
     files.set('file:///picked.json', JSON.stringify(backup));
     (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file:///picked.json' }] });
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Import'));
+    await fireEvent.press(screen.getByText('Restore from File…'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Restore this backup?', expect.stringContaining('1 items'), expect.any(Array)));
     await pressAlertButton('Restore');
     expect(state().holdings[0].name).toBe('Imported');
@@ -316,7 +316,7 @@ describe('Backup & sync screen', () => {
     files.set('file:///other.json', '{"hello":1}');
     (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file:///other.json' }] });
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Import'));
+    await fireEvent.press(screen.getByText('Restore from File…'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Import failed', 'This file is not a GuardBox backup.'));
     expect(state().holdings[0].name).toBe('Mine');
   });
@@ -325,7 +325,7 @@ describe('Backup & sync screen', () => {
     seedStore();
     (DocumentPicker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({ canceled: true, assets: null });
     await render(<SyncScreen />);
-    await fireEvent.press(screen.getByText('Import'));
+    await fireEvent.press(screen.getByText('Restore from File…'));
     expect(alert).not.toHaveBeenCalled();
   });
 
@@ -335,7 +335,7 @@ describe('Backup & sync screen', () => {
     await fireEvent.press(screen.getByText('Firebase'));
     expect(await screen.findByText('Firebase settings')).toBeOnTheScreen();
     expect(screen.getByText('Web API key')).toBeOnTheScreen();
-    expect(screen.getByText('Create account')).toBeOnTheScreen();
+    expect(screen.getByText('Create Account')).toBeOnTheScreen();
   });
 
   it('asks every provider, iCloud included, for an encryption passphrase', async () => {
@@ -344,7 +344,7 @@ describe('Backup & sync screen', () => {
     await fireEvent.press(screen.getByText('iCloud'));
     expect(await screen.findByText('iCloud settings')).toBeOnTheScreen();
     expect(screen.getByText('Encryption passphrase')).toBeOnTheScreen();
-    expect(screen.getByText(/encrypted on this phone with the passphrase before upload/)).toBeOnTheScreen();
+    expect(screen.getByText(/encrypted on this iPhone before upload/)).toBeOnTheScreen();
   });
 
   it('will not turn sync on without a passphrase of 8+ characters', async () => {
@@ -352,7 +352,7 @@ describe('Backup & sync screen', () => {
     await render(<SyncScreen />);
     await fireEvent.press(screen.getByText('iCloud'));
     await fireEvent.changeText(await screen.findByPlaceholderText('At least 8 characters'), 'short');
-    await fireEvent.press(screen.getByText('Save & sync now'));
+    await fireEvent.press(screen.getByText('Save & Sync Now'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Save failed', 'Encryption passphrase: Use at least 8 characters.'));
     expect(state().settings.syncProvider).toBe('none');
   });
@@ -365,7 +365,7 @@ describe('Backup & sync screen', () => {
     await render(<SyncScreen />);
     await fireEvent.press(screen.getByText('iCloud'));
     await fireEvent.changeText(await screen.findByPlaceholderText('At least 8 characters'), 'long enough pass');
-    await fireEvent.press(screen.getByText('Save & sync now'));
+    await fireEvent.press(screen.getByText('Save & Sync Now'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Unencrypted cloud copy', expect.stringContaining('not encrypted'), expect.any(Array)), { timeout: 5000 });
     expect((await loadConfig('icloud')).passphrase).toBe('long enough pass');
     expect(push).not.toHaveBeenCalled();
@@ -380,7 +380,7 @@ describe('Backup & sync screen', () => {
     seedStore({ settings: { ...emptyData().settings, syncProvider: 'firebase', autoSync: true } });
     await render(<SyncScreen />);
     await fireEvent.press(screen.getByText('Off'));
-    await fireEvent.press(screen.getByText('Turn off sync'));
+    await fireEvent.press(screen.getByText('Turn Off Sync'));
     await waitFor(() => expect(state().settings.syncProvider).toBe('none'));
     expect(state().settings.autoSync).toBe(false);
   });

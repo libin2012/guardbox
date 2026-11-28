@@ -10,10 +10,20 @@ const enableICloud = process.env.ENABLE_ICLOUD === '1';
 const bundleId = process.env.IOS_BUNDLE_ID ?? 'com.guardbox.app';
 const iCloudContainer = process.env.ICLOUD_CONTAINER ?? `iCloud.${bundleId}`;
 
+/**
+ * Google Drive backup and sync need an iOS OAuth client ID from your own Google
+ * Cloud project (see SYNC_SETUP.md). Its reversed form is registered as a URL
+ * scheme so Google's sign-in sheet can return to the app. Without it, the
+ * Google Drive options explain how to set it up.
+ */
+const googleIosClientId = process.env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined;
+const googleScheme = googleIosClientId ? `com.googleusercontent.apps.${googleIosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}` : undefined;
+
 const plugins: ExpoConfig['plugins'] = [
   'expo-router',
   'expo-secure-store',
   'expo-sharing',
+  'expo-web-browser',
   'expo-font',
   [
     'expo-local-authentication',
@@ -38,7 +48,7 @@ if (enableICloud) {
 const config: ExpoConfig = {
   name: 'GuardBox',
   slug: 'guardbox',
-  scheme: 'guardbox',
+  scheme: googleScheme ? ['guardbox', googleScheme] : 'guardbox',
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
@@ -62,7 +72,7 @@ const config: ExpoConfig = {
   },
   web: { favicon: './assets/favicon.png' },
   plugins,
-  extra: { iCloudEnabled: enableICloud, iCloudContainer },
+  extra: { iCloudEnabled: enableICloud, iCloudContainer, googleIosClientId },
 };
 
 export default config;
