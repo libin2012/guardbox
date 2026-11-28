@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { parseBackup } from '../store';
+import { parseSyncPayload } from '../backupCrypto';
 import { SyncProvider } from './types';
 
 const FILE = 'guardbox-backup.json';
@@ -31,9 +31,9 @@ export const icloudProvider: SyncProvider = {
   label: 'iCloud',
   description: 'Saves your backup in your private iCloud Drive. No account setup needed.',
   fields: [],
-  async push(_cfg, backup) {
+  async push(_cfg, payload) {
     const c = cloud();
-    await c.writeFile(await filePath(c), JSON.stringify(backup), { override: true });
+    await c.writeFile(await filePath(c), JSON.stringify(payload), { override: true });
   },
   async pull() {
     const c = cloud();
@@ -44,6 +44,6 @@ export const icloudProvider: SyncProvider = {
     } catch {
       // already local
     }
-    return parseBackup(await c.readFile(path));
+    return parseSyncPayload(await c.readFile(path));
   },
 };

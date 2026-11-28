@@ -1,4 +1,5 @@
-import { BackupFile, SyncProviderId } from '../types';
+import type { SyncPayload } from '../backupCrypto';
+import { SyncProviderId } from '../types';
 
 export interface FieldDef {
   key: string;
@@ -17,8 +18,9 @@ export interface SyncProvider {
   fields: FieldDef[];
   /** optional: create an account with the provider's auth service */
   signUp?(cfg: ProviderConfig): Promise<void>;
-  push(cfg: ProviderConfig, backup: BackupFile): Promise<void>;
-  pull(cfg: ProviderConfig): Promise<BackupFile | null>;
+  /** Store the payload as is. syncNow encrypts it first; providers never see plain data. */
+  push(cfg: ProviderConfig, payload: SyncPayload): Promise<void>;
+  pull(cfg: ProviderConfig): Promise<SyncPayload | null>;
 }
 
 export function required(cfg: ProviderConfig, fields: FieldDef[]): void {
@@ -42,4 +44,9 @@ export function errorMessage(json: unknown): string | undefined {
   if (!json || typeof json !== 'object') return undefined;
   const j = json as Record<string, any>;
   return j.error?.message ?? j.error_description ?? j.msg ?? j.message ?? (typeof j.error === 'string' ? j.error : undefined);
+}
+
+/** When the payload was made: from a plain backup, or now for an encrypted one (whose time is inside). */
+export function payloadTime(p: SyncPayload): string {
+  return 'exportedAt' in p ? p.exportedAt : new Date().toISOString();
 }

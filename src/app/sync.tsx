@@ -7,7 +7,7 @@ import { space, useTheme } from '../components/theme';
 import { Button, Card, Divider, Field, Row, Screen, SectionTitle, T, ToggleRow } from '../components/ui';
 import { checkPassphrase, decryptBackup, encryptBackup, isEncryptedBackup } from '../lib/backupCrypto';
 import { parseBackup, toBackup, useStore } from '../lib/store';
-import { getProvider, loadConfig, PROVIDERS, ProviderConfig, saveConfig, syncNow } from '../lib/sync';
+import { getProvider, loadConfig, PASSPHRASE_FIELD, PROVIDERS, ProviderConfig, saveConfig, syncNow } from '../lib/sync';
 import { BackupFile, SyncProviderId } from '../lib/types';
 
 const ICONS: Record<string, any> = { icloud: 'cloud-outline', firebase: 'flame-outline', supabase: 'server-outline', aws: 'logo-amazon' };
@@ -43,6 +43,8 @@ export default function SyncScreen() {
         updateSettings({ syncProvider: 'none', autoSync: false });
         return;
       }
+      const problem = checkPassphrase(cfg[PASSPHRASE_FIELD.key] ?? '');
+      if (problem) throw new Error(`Encryption passphrase: ${problem}`);
       await saveConfig(provider.id, cfg);
       updateSettings({ syncProvider: provider.id, lastSyncAt: undefined, lastSyncError: undefined });
       await doSync('auto');
@@ -51,7 +53,10 @@ export default function SyncScreen() {
   const doSync = async (mode: 'auto' | 'push' | 'pull') => {
     const r = await syncNow(mode);
     if (r.kind === 'conflict') {
-      Alert.alert('Both copies changed', 'Your phone and the cloud both have changes since the last sync. Which one do you want to keep?', [
+      const message = r.unencrypted
+        ? 'The cloud copy is not encrypted (it was uploaded by an older version of GuardBox, or by someone else) and changed since the last sync. Only use it if you know where it came from. Keeping this phone replaces it with an encrypted copy.'
+        : 'Your phone and the cloud both have changes since the last sync. Which one do you want to keep?';
+      Alert.alert(r.unencrypted ? 'Unencrypted cloud copy' : 'Both copies changed', message, [
         { text: 'Keep this phone', onPress: () => run('Upload', () => syncNow('push').then(() => undefined)) },
         { text: 'Use cloud copy', style: 'destructive', onPress: () => run('Download', async () => { restoreBackup(r.remote); updateSettings({ lastSyncAt: new Date().toISOString() }); }) },
         { text: 'Cancel', style: 'cancel' },
@@ -161,13 +166,14 @@ export default function SyncScreen() {
         ))}
       </Card>
 
-      {provider && provider.fields.length ? (
+      {provider ? (
         <Card style={{ gap: space(3) }}>
           <T weight="700">{provider.label} settings</T>
-          {provider.fields.map((f) => (
+          {[...provider.fields, PASSPHRASE_FIELD].map((f) => (
             <Field key={f.key} label={f.label} value={cfg[f.key] ?? ''} placeholder={f.placeholder} secureTextEntry={f.secure} autoCapitalize="none" autoCorrect={false} onChangeText={(v) => setCfg((c) => ({ ...c, [f.key]: v }))} />
           ))}
-          <T size={12} muted>See SYNC_SETUP.md in the project for the 5-minute console setup.</T>
+          <T size={12} muted>Your data is encrypted on this phone with the passphrase before upload, so {provider.label} only stores scrambled data. Use the same passphrase on every device. It cannot be recovered if you forget it.</T>
+          {provider.fields.length ? <T size={12} muted>See SYNC_SETUP.md in the project for the 5-minute console setup.</T> : null}
           {provider.signUp ? <Button title="Create account" variant="secondary" loading={busy === 'Sign up'} onPress={() => run('Sign up', async () => { await provider.signUp!(cfg); Alert.alert('Account created', 'Check your email if your project requires confirmation, then tap Save & sync.'); })} /> : null}
         </Card>
       ) : null}

@@ -1,9 +1,10 @@
+import { EncryptedBackupFile, forgetPassphraseKey, openBackup, sealBackup } from '../backupCrypto';
 import { emptyData } from '../defaults';
 import { toBackup, useStore } from '../store';
 import { awsProvider } from '../sync/aws';
 import { firebaseProvider } from '../sync/firebase';
 import { icloudProvider } from '../sync/icloud';
-import { getProvider, loadConfig, PROVIDERS, saveConfig, syncNow } from '../sync';
+import { getProvider, loadConfig, PROVIDERS, saveConfig, SyncPayload, syncNow } from '../sync';
 import { supabaseProvider } from '../sync/supabase';
 import { errorMessage, required } from '../sync/types';
 import { BackupFile } from '../types';
@@ -23,19 +24,29 @@ function remoteBackup(exportedAt: string, name = 'From cloud'): BackupFile {
   return { ...toBackup({ ...emptyData(), holdings: [makeHolding({ name })], modifiedAt: exportedAt }), exportedAt };
 }
 
-/** Use the iCloud provider slot with a fake cloud we control. */
-function fakeCloud(remote: BackupFile | null) {
+const PASS = 'sync passphrase 1';
+const FAST = { N: 2 ** 10, r: 8, p: 1 };
+
+/** What another device running this version would have uploaded. */
+const encrypted = (b: BackupFile, passphrase = PASS) => sealBackup(b, passphrase, { params: FAST });
+
+/** Use the iCloud provider slot with a fake cloud we control. Plain BackupFiles stand for uploads by older versions. */
+function fakeCloud(remote: SyncPayload | null) {
   const push = jest.spyOn(icloudProvider, 'push').mockResolvedValue();
   const pull = jest.spyOn(icloudProvider, 'pull').mockResolvedValue(remote);
   return { push, pull };
 }
 
-function seedSynced(opts: { lastSyncAt: string; modifiedAt: string }) {
+/** Decrypt what syncNow uploaded. */
+const uploaded = (push: jest.SpyInstance, call = 0) => openBackup(push.mock.calls[call][1] as EncryptedBackupFile, PASS, 'file');
+
+async function seedSynced(opts: { lastSyncAt: string; modifiedAt: string }, passphrase: string | null = PASS) {
   seedStore({
     holdings: [makeHolding({ name: 'On phone' })],
     modifiedAt: opts.modifiedAt,
     settings: { ...emptyData().settings, syncProvider: 'icloud', lastSyncAt: opts.lastSyncAt },
   });
+  await saveConfig('icloud', passphrase ? { passphrase } : {});
 }
 
 describe('providers', () => {
@@ -77,32 +88,32 @@ describe('syncNow', () => {
   });
 
   it('uploads when the cloud is empty', async () => {
-    seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    await seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
     const cloud = fakeCloud(null);
     expect(await syncNow()).toEqual({ kind: 'pushed' });
-    expect(cloud.push.mock.calls[0][1].data.holdings[0].name).toBe('On phone');
+    expect((await uploaded(cloud.push)).data.holdings[0].name).toBe('On phone');
     expect(store().data.settings.lastSyncAt).toBeTruthy();
   });
 
   it('uploads when only the phone changed', async () => {
-    seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-03T00:00:00.000Z' });
-    const cloud = fakeCloud(remoteBackup('2026-01-01T00:00:00.000Z'));
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-03T00:00:00.000Z' });
+    const cloud = fakeCloud(await encrypted(remoteBackup('2026-01-01T00:00:00.000Z')));
     expect(await syncNow()).toEqual({ kind: 'pushed' });
     expect(cloud.push).toHaveBeenCalled();
   });
 
   it('downloads when only the cloud changed', async () => {
-    seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
-    const cloud = fakeCloud(remoteBackup('2026-01-03T00:00:00.000Z'));
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(await encrypted(remoteBackup('2026-01-03T00:00:00.000Z')));
     expect(await syncNow()).toEqual({ kind: 'pulled' });
     expect(cloud.push).not.toHaveBeenCalled();
     expect(store().data.holdings[0].name).toBe('From cloud');
   });
 
   it('reports a conflict when both changed and changes nothing', async () => {
-    seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-03T00:00:00.000Z' });
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-03T00:00:00.000Z' });
     const remote = remoteBackup('2026-01-04T00:00:00.000Z');
-    const cloud = fakeCloud(remote);
+    const cloud = fakeCloud(await encrypted(remote));
     expect(await syncNow()).toEqual({ kind: 'conflict', remote });
     expect(cloud.push).not.toHaveBeenCalled();
     expect(store().data.holdings[0].name).toBe('On phone');
@@ -110,15 +121,15 @@ describe('syncNow', () => {
   });
 
   it('does nothing when neither changed', async () => {
-    seedSynced({ lastSyncAt: '2026-01-05T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
-    const cloud = fakeCloud(remoteBackup('2026-01-02T00:00:00.000Z'));
+    await seedSynced({ lastSyncAt: '2026-01-05T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(await encrypted(remoteBackup('2026-01-02T00:00:00.000Z')));
     expect(await syncNow()).toEqual({ kind: 'up-to-date' });
     expect(cloud.push).not.toHaveBeenCalled();
   });
 
   it('forces an upload or download when asked', async () => {
-    seedSynced({ lastSyncAt: '2026-01-05T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
-    const cloud = fakeCloud(remoteBackup('2026-01-02T00:00:00.000Z'));
+    await seedSynced({ lastSyncAt: '2026-01-05T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(await encrypted(remoteBackup('2026-01-02T00:00:00.000Z')));
     expect(await syncNow('push')).toEqual({ kind: 'pushed' });
     expect(cloud.pull).not.toHaveBeenCalled();
     expect(await syncNow('pull')).toEqual({ kind: 'pulled' });
@@ -126,19 +137,131 @@ describe('syncNow', () => {
   });
 
   it('cannot download from an empty cloud', async () => {
-    seedSynced({ lastSyncAt: '', modifiedAt: '' });
+    await seedSynced({ lastSyncAt: '', modifiedAt: '' });
     fakeCloud(null);
     await expect(syncNow('pull')).rejects.toThrow('No backup found in the cloud yet.');
   });
 
   it('records the last error and clears it after a good sync', async () => {
-    seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    await seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
     jest.spyOn(icloudProvider, 'pull').mockRejectedValueOnce(new Error('offline'));
     await expect(syncNow()).rejects.toThrow('offline');
     expect(store().data.settings.lastSyncError).toBe('offline');
     fakeCloud(null);
     await syncNow();
     expect(store().data.settings.lastSyncError).toBeUndefined();
+  });
+});
+
+describe('end-to-end encryption of sync', () => {
+  beforeEach(() => forgetPassphraseKey());
+
+  it('uploads only ciphertext, which opens with the passphrase', async () => {
+    await seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(null);
+    await syncNow('push');
+    const payload = cloud.push.mock.calls[0][1];
+    expect(payload).toMatchObject({ app: 'GuardBox', encrypted: 1, kdf: { name: 'scrypt', N: 2 ** 16 } });
+    expect(JSON.stringify(payload)).not.toContain('On phone');
+    expect((await uploaded(cloud.push)).data.holdings[0].name).toBe('On phone');
+  });
+
+  it('runs scrypt once per passphrase, with a fresh IV for every upload', async () => {
+    await seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(null);
+    await syncNow('push');
+    await syncNow('push');
+    const [a, b] = [cloud.push.mock.calls[0][1] as EncryptedBackupFile, cloud.push.mock.calls[1][1] as EncryptedBackupFile];
+    expect(a.kdf.salt).toBe(b.kdf.salt);
+    expect(a.data.slice(0, 16)).not.toBe(b.data.slice(0, 16));
+    // changing the settings starts over with a new salt
+    await saveConfig('icloud', { passphrase: 'another passphrase' });
+    await syncNow('push');
+    expect((cloud.push.mock.calls[2][1] as EncryptedBackupFile).kdf.salt).not.toBe(a.kdf.salt);
+  });
+
+  it('needs a passphrase before anything is uploaded', async () => {
+    await seedSynced({ lastSyncAt: '', modifiedAt: '2026-01-01T00:00:00.000Z' }, null);
+    const cloud = fakeCloud(null);
+    await expect(syncNow()).rejects.toThrow(/Set an encryption passphrase/);
+    expect(cloud.pull).not.toHaveBeenCalled();
+    expect(cloud.push).not.toHaveBeenCalled();
+    expect(store().data.settings.lastSyncError).toMatch(/encryption passphrase/);
+  });
+
+  it('stops, changes nothing and never overwrites the cloud when the passphrase is wrong', async () => {
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-03T00:00:00.000Z' });
+    const cloud = fakeCloud(await encrypted(remoteBackup('2026-01-01T00:00:00.000Z'), 'someone elses pass'));
+    await expect(syncNow()).rejects.toThrow(/wrong sync passphrase, or it was changed by someone else/);
+    expect(cloud.push).not.toHaveBeenCalled();
+    expect(store().data.holdings[0].name).toBe('On phone');
+  });
+
+  it('detects a cloud copy that was changed by someone else', async () => {
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const remote = await encrypted(remoteBackup('2026-01-03T00:00:00.000Z'));
+    const chars = remote.data.split('');
+    chars[30] = chars[30] === 'A' ? 'B' : 'A';
+    const cloud = fakeCloud({ ...remote, data: chars.join('') });
+    await expect(syncNow()).rejects.toThrow(/could not be opened/);
+    await expect(syncNow('pull')).rejects.toThrow(/could not be opened/);
+    expect(cloud.push).not.toHaveBeenCalled();
+    expect(store().data.holdings[0].name).toBe('On phone');
+  });
+
+  it('replaces an unchanged plain copy from an older version with an encrypted one', async () => {
+    await seedSynced({ lastSyncAt: '2026-01-05T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const cloud = fakeCloud(remoteBackup('2026-01-02T00:00:00.000Z'));
+    expect(await syncNow()).toEqual({ kind: 'pushed' });
+    expect(cloud.push.mock.calls[0][1]).toMatchObject({ encrypted: 1 });
+    expect(store().data.holdings[0].name).toBe('On phone');
+  });
+
+  it('asks before taking a plain cloud copy that changed', async () => {
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    const remote = remoteBackup('2026-01-03T00:00:00.000Z');
+    const cloud = fakeCloud(remote);
+    expect(await syncNow()).toEqual({ kind: 'conflict', remote, unencrypted: true });
+    expect(cloud.push).not.toHaveBeenCalled();
+    expect(store().data.holdings[0].name).toBe('On phone');
+    // an explicit download is the user's choice
+    expect(await syncNow('pull')).toEqual({ kind: 'pulled' });
+    expect(store().data.holdings[0].name).toBe('From cloud');
+  });
+
+  it('opens copies from another device that used the same passphrase', async () => {
+    await seedSynced({ lastSyncAt: '2026-01-02T00:00:00.000Z', modifiedAt: '2026-01-01T00:00:00.000Z' });
+    fakeCloud(await sealBackup(remoteBackup('2026-01-03T00:00:00.000Z', 'From iPad'), PASS, { params: FAST }));
+    expect(await syncNow()).toEqual({ kind: 'pulled' });
+    expect(store().data.holdings[0].name).toBe('From iPad');
+  });
+});
+
+describe('providers store encrypted payloads as they are', () => {
+  it('Firebase round-trips an encrypted payload', async () => {
+    const payload = await encrypted(remoteBackup('2026-01-01T00:00:00.000Z'));
+    const f = mockFetch((url) => (url.includes('identitytoolkit') ? json({ idToken: 't', localId: 'u' }) : json({})));
+    await firebaseProvider.push({ apiKey: 'a', projectId: 'p', email: 'e', password: 'pw' }, payload);
+    const body = JSON.parse(f.mock.calls[1][1]!.body as string);
+    expect(Date.parse(body.fields.updatedAt.timestampValue)).not.toBeNaN();
+    const stored = body.fields.data.stringValue as string;
+    expect(stored).not.toContain('From cloud');
+    mockFetch((url) => (url.includes('identitytoolkit') ? json({ idToken: 't', localId: 'u' }) : json({ fields: { data: { stringValue: stored } } })));
+    expect(await firebaseProvider.pull({ apiKey: 'a', projectId: 'p', email: 'e', password: 'pw' })).toEqual(payload);
+  });
+
+  it('AWS round-trips an encrypted payload', async () => {
+    const payload = await encrypted(remoteBackup('2026-01-01T00:00:00.000Z'));
+    mockFetch(() => text(JSON.stringify(payload)));
+    const auth = { AuthenticationResult: { IdToken: 'id' } };
+    mockFetch((url, init) => {
+      const target = (init?.headers as Record<string, string> | undefined)?.['X-Amz-Target'];
+      if (target?.endsWith('.InitiateAuth')) return json(auth);
+      if (target?.endsWith('.GetId')) return json({ IdentityId: 'r:abc' });
+      if (target?.endsWith('.GetCredentialsForIdentity')) return json({ Credentials: { AccessKeyId: 'A', SecretKey: 'S', SessionToken: 'T' } });
+      return text(JSON.stringify(payload));
+    });
+    expect(await awsProvider.pull({ region: 'r', userPoolId: 'r_p', clientId: 'c', identityPoolId: 'r:p', bucket: 'b', email: 'e', password: 'pw' })).toEqual(payload);
   });
 });
 

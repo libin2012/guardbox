@@ -47,7 +47,7 @@ src/lib/              All business logic, no UI
   security.ts         Passcode (salted, hashed, keychain), Face ID / Touch ID, sync secrets, lock state
   profile.ts          Profile validation and normalisation (name + email required, mobile optional)
   defaults.ts         Built-in categories, default settings, fallback FX rates, currency list
-  sync/               SyncProvider implementations (icloud, firebase, supabase, aws + sigv4) and syncNow()
+  sync/               SyncProvider implementations (icloud, firebase, supabase, aws + sigv4) and syncNow(); uploads are end-to-end encrypted with the sync passphrase
 src/test/             Test-only helpers (never imported by app code)
 src/__tests__/screens Screen and launch-flow tests (kept out of src/app so they never become routes)
 ```
@@ -59,6 +59,7 @@ Key rules of the data model:
 - Every user edit goes through the store's `commit()`, which stamps `modifiedAt`, updates today's snapshot, saves, and notifies auto sync. Price and FX refreshes are not user edits (they do not change `modifiedAt`).
 - `migrate()` in `store.ts` must accept every older saved shape. When you add a field to `AppData`, give it a default there and add a migration test.
 - Everything saved to AsyncStorage is encrypted (`vault.ts`, see SECURITY.md). Never write app data to AsyncStorage, files or logs in plain text. If saved data cannot be opened (`storageError`), nothing is saved until the user retries or erases; keep it that way so unreadable data is never overwritten.
+- Cloud sync payloads are sealed in `syncNow()` (`sealBackup`) before any provider sees them; providers store the payload as is and must never receive a plain `BackupFile` from this version.
 - Backups (`toBackup`) contain only the base currency from settings: never API keys, lock state or sync credentials. Sync secrets live in the keychain.
 - The profile is required (onboarding runs until `isCompleteProfile` passes). Erasing data and restoring a backup keep the profile typed on this device.
 

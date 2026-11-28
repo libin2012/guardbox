@@ -2,8 +2,8 @@
  * Firebase via REST (Identity Toolkit + Firestore). No SDK needed.
  * Document: users/{uid}/guardbox/backup  { data: string, updatedAt: timestamp }
  */
-import { parseBackup } from '../store';
-import { errorMessage, postJson, ProviderConfig, required, SyncProvider } from './types';
+import { parseSyncPayload } from '../backupCrypto';
+import { errorMessage, payloadTime, postJson, ProviderConfig, required, SyncProvider } from './types';
 
 const fields = [
   { key: 'apiKey', label: 'Web API key', placeholder: 'AIza…' },
@@ -43,13 +43,13 @@ export const firebaseProvider: SyncProvider = {
       returnSecureToken: true,
     });
   },
-  async push(cfg, backup) {
+  async push(cfg, payload) {
     const s = await signIn(cfg);
     const res = await fetch(docUrl(cfg, s.localId), {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${s.idToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fields: { data: { stringValue: JSON.stringify(backup) }, updatedAt: { timestampValue: backup.exportedAt } },
+        fields: { data: { stringValue: JSON.stringify(payload) }, updatedAt: { timestampValue: payloadTime(payload) } },
       }),
     });
     if (!res.ok) throw new Error(errorMessage(await res.json().catch(() => null)) ?? `Firestore HTTP ${res.status}`);
@@ -61,6 +61,6 @@ export const firebaseProvider: SyncProvider = {
     const json = await res.json();
     if (!res.ok) throw new Error(errorMessage(json) ?? `Firestore HTTP ${res.status}`);
     const text = json?.fields?.data?.stringValue;
-    return text ? parseBackup(text) : null;
+    return text ? parseSyncPayload(text) : null;
   },
 };

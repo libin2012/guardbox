@@ -20,7 +20,11 @@ Crypto code: [`@noble/ciphers`](https://github.com/paulmillr/noble-ciphers) (AES
 ## Backups
 
 - **Backup file (Export)**: you can protect it with a passphrase. The key is derived with scrypt (N = 2^16, r = 8, p = 1, random salt) and the file is sealed with AES-256-GCM; the scrypt settings are authenticated too. A forgotten passphrase cannot be recovered. A plain export is still possible and is readable by anyone who gets the file. The temporary copy is deleted from the app's cache after sharing.
-- **Cloud sync (iCloud, Firebase, Supabase, AWS)**: the uploaded backup is **not** end-to-end encrypted yet. It is protected by your provider's account security and encryption in transit (HTTPS) and at rest on their side.
+- **Cloud sync (iCloud, Firebase, Supabase, AWS)**: **end-to-end encrypted.** Turning sync on needs an encryption passphrase (8+ characters), kept in the Keychain with the provider settings. Before upload the backup is sealed on the phone exactly like a passphrase backup file (scrypt + AES-256-GCM), so the provider only stores ciphertext and never sees the passphrase. The scrypt key is derived once per passphrase and kept in memory, and every upload still gets a fresh IV. Use the same passphrase on every device.
+  - A cloud copy that fails to decrypt (wrong passphrase, or changed by someone with access to your cloud account) stops the sync with an error. Nothing on the phone changes and the cloud copy is not overwritten automatically.
+  - A plain copy uploaded by an older version is replaced by an encrypted one on the next sync. If that plain copy changed since your last sync, GuardBox asks before using it, because anyone with access to the storage could have written it.
+  - What the provider can still see: that you use GuardBox, the size of your backup and when you sync.
+  - Forgetting the passphrase means the cloud copy cannot be opened. Your phone's data is unaffected: set a new passphrase and upload again.
 
 ## Limits (please read)
 
