@@ -30,6 +30,7 @@ Built with **React Native + Expo (SDK 58) + TypeScript**, so the same code runs 
   - **iCloud** sync (private iCloud Drive container).
   - **Firebase**, **Supabase** or **AWS** (Cognito + S3), each using your own project. See [SYNC_SETUP.md](SYNC_SETUP.md).
   - Two-way sync with conflict detection: if both the phone and the cloud changed, you choose which copy to keep.
+- **EPF passbook import** (India): download your passbook PDF from UMANG or passbook.epfindia.gov.in, then share it to GuardBox ("Open in GuardBox") or pick it in Settings → Import EPF passbook. The PDF is read on the phone with Apple's PDFKit (password-protected PDFs supported; UMANG often uses your UAN as the password). GuardBox finds the employee share, employer share and pension (EPS) balances, lets you check them, then creates or updates a "Provident fund (EPF)" asset. If the layout isn't recognised you type the figures in instead. The copy of the PDF is deleted after import, nothing is uploaded, and there is no EPFO login automation. An optional monthly (or 3-monthly) local reminder opens the import screen.
 - Light and dark mode. No bank linking, no ads, no paywall.
 
 ## Run it on your iPhone (Mac + Xcode)
